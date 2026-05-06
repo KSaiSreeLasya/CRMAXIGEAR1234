@@ -35,6 +35,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               Dashboard
             </Link>
             <Link
+              to="/projects"
+              className="text-sm font-medium transition-colors hover:text-primary"
+            >
+              Projects
+            </Link>
+            <Link
               to="/sales"
               className="text-sm font-medium transition-colors hover:text-primary"
             >
@@ -62,6 +68,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Dashboard
+              </Link>
+              <Link
+                to="/projects"
+                className="text-sm font-medium transition-colors hover:text-primary"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Projects
               </Link>
               <Link
                 to="/sales"
