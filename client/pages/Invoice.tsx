@@ -94,12 +94,18 @@ export default function Invoice() {
       const html2pdf = html2pdfModule.default;
 
       const opt = {
-        margin: [5, 5, 5, 5],
+        margin: 0,
         filename: `invoice-${invoiceNo.replace(/\//g, "-")}.pdf`,
         image: { type: "png", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: "avoid-all", before: ["#invoice-container"] },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: "#ffffff"
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
+        pagebreak: { mode: "avoid-all" },
       };
 
       html2pdf().set(opt).from(element).save();
