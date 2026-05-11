@@ -240,27 +240,25 @@ export default function InvoiceContent({
         </p>
       </div>
 
-      {/* Bank Details */}
+      {/* Terms and Conditions */}
       <div className="mb-4 pb-4 border-b-2 border-gray-300">
         <h3 className="font-bold mb-4 text-sm text-gray-800">
-          Bank Details - Beneficiary Bank Details
+          Terms and Conditions
         </h3>
-        <div className="text-sm space-y-2 text-gray-700">
+        <div className="text-sm space-y-3 text-gray-700">
           <p>
-            <span className="font-bold text-gray-800">Bank A/c No -</span>{" "}
-            {COMPANY_INFO.bank.accountNo}
+            1. The Consignee of E-Scooter & E-RICKSHAW has checked & confirmed
+            that max speed is 25 Km/Hr only.
           </p>
           <p>
-            <span className="font-bold text-gray-800">Bank -</span>{" "}
-            {COMPANY_INFO.bank.name}
+            2. Buying Lithium Battery is Consignee&apos;s Decision. Hereby any
+            climatically adversity is buyer&apos;s responsibility.
           </p>
           <p>
-            <span className="font-bold text-gray-800">IFSC Code -</span>{" "}
-            {COMPANY_INFO.bank.ifscCode}
-          </p>
-          <p>
-            <span className="font-bold text-gray-800">Location -</span>{" "}
-            {COMPANY_INFO.bank.location}
+            3. The Rate specified herein is applicable solely to this performa
+            and proforma invoice is valid for a period of 24 hours from the
+            time of issue. Any orders placed after this period may be subject
+            to revised pricing and terms.
           </p>
         </div>
       </div>
@@ -272,11 +270,6 @@ export default function InvoiceContent({
         </p>
         <p className="font-bold text-gray-800 text-xs">
           {COMPANY_INFO.name}
-        </p>
-        <p className="text-xs text-gray-600 leading-tight">
-          Plot no.102, 103, Sri Krishna Vihar, Temple Lane, Mythri Nagar Phase-2,
-          Mathrusri Nagar, Madinaguda, Serilingampally, K.V.Rangareddy- 500049,
-          Telangana, India
         </p>
       </div>
     </div>
