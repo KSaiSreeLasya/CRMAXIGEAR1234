@@ -48,6 +48,12 @@ export default function Accounts() {
     loadEstimations();
   }, []);
 
+  useEffect(() => {
+    if (!editingId && !formData.estimationSlipNo) {
+      setFormData((prev) => ({ ...prev, estimationSlipNo: getNextEstimationSlipNo(estimations) }));
+    }
+  }, [estimations, editingId, formData.estimationSlipNo]);
+
   const loadEstimations = async () => {
     try {
       if (supabase) {
@@ -116,7 +122,7 @@ export default function Accounts() {
 
   const cancelEditEstimation = () => {
     setEditingId(null);
-    setFormData(DEFAULT_FORM);
+    setFormData({ ...DEFAULT_FORM, estimationSlipNo: getNextEstimationSlipNo(estimations) });
   };
 
   const handleDeleteEstimation = async (id: string) => {
@@ -188,7 +194,7 @@ export default function Accounts() {
 
         const next = estimations.map((row) => (row.id === editingId ? updatedRow : row));
         persistEstimations(next);
-        setFormData(DEFAULT_FORM);
+        setFormData({ ...DEFAULT_FORM, estimationSlipNo: getNextEstimationSlipNo(next) });
         setEditingId(null);
         return;
       }
@@ -243,7 +249,10 @@ export default function Accounts() {
           };
 
           setEstimations((prev) => [dbRecord, ...prev]);
-          setFormData(DEFAULT_FORM);
+          setFormData((prev) => ({
+            ...DEFAULT_FORM,
+            estimationSlipNo: getNextEstimationSlipNo([dbRecord, ...estimations]),
+          }));
           return;
         } catch (supabaseError) {
           console.error("Error creating estimation in Supabase:", supabaseError);
@@ -252,7 +261,7 @@ export default function Accounts() {
 
       const updated = [localRecord, ...estimations];
       persistEstimations(updated);
-      setFormData(DEFAULT_FORM);
+      setFormData({ ...DEFAULT_FORM, estimationSlipNo: getNextEstimationSlipNo(updated) });
     } catch (error: any) {
       const errorMessage = error?.message || "Failed to save estimation";
       console.error("Error saving estimation:", errorMessage);
@@ -434,7 +443,7 @@ export default function Accounts() {
                         <td className="px-4 py-3">{item.contactNo}</td>
                         <td className="px-4 py-3">{item.estimationDate}</td>
                         <td className="px-4 py-3 font-semibold">
-                          {formatAmount(item.amount * 1.05)}
+                          {formatAmount(item.amount)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -476,4 +485,30 @@ export default function Accounts() {
       </div>
     </Layout>
   );
+}
+
+function getNextEstimationSlipNo(estimations: EstimationRecord[]): string {
+  const defaultNo = "EST/2026-27/001";
+  let maxNo = defaultNo;
+  let maxSuffix = 0;
+
+  for (const row of estimations) {
+    const value = row.estimationSlipNo?.trim();
+    if (!value) continue;
+    const match = value.match(/^(.*?)(\d+)$/);
+    if (!match) continue;
+    const suffix = Number(match[2]);
+    if (Number.isNaN(suffix)) continue;
+    if (suffix > maxSuffix) {
+      maxSuffix = suffix;
+      maxNo = value;
+    }
+  }
+
+  const match = maxNo.match(/^(.*?)(\d+)$/);
+  if (!match) return defaultNo;
+  const prefix = match[1];
+  const width = match[2].length;
+  const next = String(Number(match[2]) + 1).padStart(width, "0");
+  return `${prefix}${next}`;
 }

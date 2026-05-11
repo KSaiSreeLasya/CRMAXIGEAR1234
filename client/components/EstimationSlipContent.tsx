@@ -12,6 +12,7 @@ interface EstimationRecord {
 
 interface EstimationSlipContentProps {
   estimation: EstimationRecord;
+  gstType: "igst" | "cgst-sgst";
   forPrint?: boolean;
 }
 
@@ -29,11 +30,16 @@ const COMPANY_INFO = {
 
 export default function EstimationSlipContent({
   estimation,
+  gstType,
   forPrint = false,
 }: EstimationSlipContentProps) {
-  const baseAmount = estimation.amount;
-  const gstAmount = baseAmount * 0.05;
-  const totalAmount = baseAmount + gstAmount;
+  // Amount entered in CRM is GST-inclusive.
+  const totalAmount = estimation.amount;
+  const taxableAmount = roundCurrency(totalAmount / 1.05);
+  const totalGstAmount = roundCurrency(totalAmount - taxableAmount);
+  const igstAmount = gstType === "igst" ? totalGstAmount : 0;
+  const cgstAmount = gstType === "cgst-sgst" ? roundCurrency(totalGstAmount / 2) : 0;
+  const sgstAmount = gstType === "cgst-sgst" ? roundCurrency(totalGstAmount - cgstAmount) : 0;
 
   const containerClass = forPrint
     ? "bg-white text-black p-12 w-full print:p-12"
@@ -116,19 +122,32 @@ export default function EstimationSlipContent({
           <tr>
             <td className="border border-gray-400 px-3 py-2 text-xs">1</td>
             <td className="border border-gray-400 px-3 py-2 text-xs">
-              Estimation cost for model - {estimation.model}
+              Estimation cost for model - {estimation.model} (Taxable Value)
             </td>
             <td className="border border-gray-400 px-3 py-2 text-xs text-right font-semibold">
-              {baseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              {taxableAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </td>
           </tr>
           <tr>
             <td className="border border-gray-400 px-3 py-2 text-xs">2</td>
-            <td className="border border-gray-400 px-3 py-2 text-xs">GST (5%)</td>
+            <td className="border border-gray-400 px-3 py-2 text-xs">
+              {gstType === "igst" ? "IGST (5%)" : "CGST (2.5%)"}
+            </td>
             <td className="border border-gray-400 px-3 py-2 text-xs text-right font-semibold">
-              {gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              {(gstType === "igst" ? igstAmount : cgstAmount).toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+              })}
             </td>
           </tr>
+          {gstType === "cgst-sgst" && (
+            <tr>
+              <td className="border border-gray-400 px-3 py-2 text-xs">3</td>
+              <td className="border border-gray-400 px-3 py-2 text-xs">SGST (2.5%)</td>
+              <td className="border border-gray-400 px-3 py-2 text-xs text-right font-semibold">
+                {sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </td>
+            </tr>
+          )}
           <tr className="bg-gray-50">
             <td
               className="border border-gray-400 px-3 py-2 text-xs font-bold text-right"
@@ -174,4 +193,8 @@ export default function EstimationSlipContent({
       </div>
     </div>
   );
+}
+
+function roundCurrency(value: number): number {
+  return Number(value.toFixed(2));
 }

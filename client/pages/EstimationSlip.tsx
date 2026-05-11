@@ -22,12 +22,38 @@ export default function EstimationSlip() {
   const { estimationId } = useParams();
   const navigate = useNavigate();
   const [estimation, setEstimation] = useState<EstimationRecord | null>(null);
+  const [gstType, setGstType] = useState<"igst" | "cgst-sgst">("cgst-sgst");
+  const settingsKey = estimationId ? `crm_estimation_settings_${estimationId}` : null;
 
   useEffect(() => {
     if (estimationId) {
       loadEstimation();
     }
   }, [estimationId]);
+
+  useEffect(() => {
+    if (!settingsKey) return;
+    try {
+      const saved = localStorage.getItem(settingsKey);
+      if (!saved) {
+        setGstType("cgst-sgst");
+        return;
+      }
+      const parsed = JSON.parse(saved) as { gstType?: "igst" | "cgst-sgst" };
+      setGstType(parsed.gstType === "igst" || parsed.gstType === "cgst-sgst" ? parsed.gstType : "cgst-sgst");
+    } catch (error) {
+      console.error("Error loading estimation slip settings:", error);
+    }
+  }, [settingsKey]);
+
+  useEffect(() => {
+    if (!settingsKey) return;
+    try {
+      localStorage.setItem(settingsKey, JSON.stringify({ gstType }));
+    } catch (error) {
+      console.error("Error saving estimation slip settings:", error);
+    }
+  }, [settingsKey, gstType]);
 
   const loadEstimation = async () => {
     try {
@@ -135,7 +161,23 @@ export default function EstimationSlip() {
             </Button>
           </div>
 
-          <EstimationSlipContent estimation={estimation} forPrint={false} />
+          <div className="mb-6 print:hidden">
+            <div className="bg-white p-4 rounded-lg border border-border shadow-sm max-w-4xl mx-auto">
+              <label className="block text-sm font-semibold mb-2 text-gray-700">
+                GST Type:
+              </label>
+              <select
+                value={gstType}
+                onChange={(e) => setGstType(e.target.value as "igst" | "cgst-sgst")}
+                className="text-sm border border-gray-300 rounded px-3 py-2 bg-white font-medium w-full"
+              >
+                <option value="cgst-sgst">CGST + SGST (2.5% each)</option>
+                <option value="igst">IGST (5%)</option>
+              </select>
+            </div>
+          </div>
+
+          <EstimationSlipContent estimation={estimation} gstType={gstType} forPrint={false} />
         </div>
       </div>
     </Layout>

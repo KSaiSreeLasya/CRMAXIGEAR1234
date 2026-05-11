@@ -11,15 +11,59 @@ export default function Invoice() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
-  const [invoiceNo, setInvoiceNo] = useState("AAV/2026-27/001");
-  const [gstType, setGstType] = useState<"igst" | "cgst-sgst">("igst");
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [gstType, setGstType] = useState<"igst" | "cgst-sgst">("cgst-sgst");
   const [placeOfSupply, setPlaceOfSupply] = useState<string>("TG");
+  const settingsKey = projectId ? `crm_invoice_settings_${projectId}` : null;
 
   useEffect(() => {
     if (projectId) {
       loadProject();
     }
   }, [projectId]);
+
+  useEffect(() => {
+    if (!settingsKey) return;
+    try {
+      const saved = localStorage.getItem(settingsKey);
+      if (!saved) {
+        setInvoiceNo(getNextInvoiceNumber());
+        setGstType("cgst-sgst");
+        setPlaceOfSupply("TG");
+        return;
+      }
+
+      const parsed = JSON.parse(saved) as {
+        invoiceNo?: string;
+        gstType?: "igst" | "cgst-sgst";
+        placeOfSupply?: string;
+      };
+      setInvoiceNo(parsed.invoiceNo || getNextInvoiceNumber());
+      setGstType(parsed.gstType === "igst" || parsed.gstType === "cgst-sgst" ? parsed.gstType : "cgst-sgst");
+      setPlaceOfSupply(parsed.placeOfSupply || "TG");
+    } catch (error) {
+      console.error("Error loading saved invoice settings:", error);
+      setInvoiceNo(getNextInvoiceNumber());
+      setGstType("cgst-sgst");
+      setPlaceOfSupply("TG");
+    }
+  }, [settingsKey]);
+
+  useEffect(() => {
+    if (!settingsKey) return;
+    try {
+      localStorage.setItem(
+        settingsKey,
+        JSON.stringify({
+          invoiceNo,
+          gstType,
+          placeOfSupply,
+        }),
+      );
+    } catch (error) {
+      console.error("Error saving invoice settings:", error);
+    }
+  }, [settingsKey, invoiceNo, gstType, placeOfSupply]);
 
   const loadProject = async () => {
     try {
@@ -47,7 +91,6 @@ export default function Invoice() {
               createdAt: new Date(data.created_at).toLocaleDateString(),
             };
             setProject(project);
-            setInvoiceNo(`AAV/2026-27/001`);
             return;
           }
         } catch (supabaseError) {
@@ -62,7 +105,6 @@ export default function Invoice() {
         const foundProject = projects.find((p) => p.id === projectId);
         if (foundProject) {
           setProject(foundProject);
-          setInvoiceNo(`AAV/2026-27/${String(projects.indexOf(foundProject) + 1).padStart(3, "0")}`);
         }
       }
     } catch (error) {
@@ -298,4 +340,41 @@ export default function Invoice() {
       `}</style>
     </Layout>
   );
+}
+
+function getNextInvoiceNumber(): string {
+  const defaultInvoiceNo = "AAV/2026-27/001";
+  let maxInvoiceNo = defaultInvoiceNo;
+  let maxNumericSuffix = 0;
+
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("crm_invoice_settings_")) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { invoiceNo?: string };
+      const invoice = parsed.invoiceNo?.trim();
+      if (!invoice) continue;
+
+      const match = invoice.match(/^(.*?)(\d+)$/);
+      if (!match) continue;
+      const numericValue = Number(match[2]);
+      if (Number.isNaN(numericValue)) continue;
+
+      if (numericValue > maxNumericSuffix) {
+        maxNumericSuffix = numericValue;
+        maxInvoiceNo = invoice;
+      }
+    }
+  } catch (error) {
+    console.error("Error deriving next invoice number:", error);
+  }
+
+  const lastMatch = maxInvoiceNo.match(/^(.*?)(\d+)$/);
+  if (!lastMatch) return defaultInvoiceNo;
+  const prefix = lastMatch[1];
+  const width = lastMatch[2].length;
+  const nextValue = String(Number(lastMatch[2]) + 1).padStart(width, "0");
+  return `${prefix}${nextValue}`;
 }

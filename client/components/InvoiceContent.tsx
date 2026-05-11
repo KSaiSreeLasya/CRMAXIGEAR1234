@@ -13,8 +13,6 @@ const COMPANY_INFO = {
   address: "SY 02, PLOT NO.148, MYTHRI NAGAR, MADINAGUDA",
   city: "HYDERABAD, TELANGANA, INDIA 500049",
   gstin: "36ACJFA4386L1ZW",
-  pan: "ACJFA4386L",
-  llpin: "ACN-4885",
   bank: {
     name: "IDFC FIRST BANK",
     accountNo: "69392193637",
@@ -30,21 +28,14 @@ export default function InvoiceContent({
   placeOfSupply,
   forPrint = false,
 }: InvoiceContentProps) {
-  // Calculate taxes based on GST type
-  const baseAmount = project.amount;
-  let igstAmount = 0;
-  let cgstAmount = 0;
-  let sgstAmount = 0;
-  let totalAmount = baseAmount;
-
-  if (gstType === "igst") {
-    igstAmount = baseAmount * 0.05;
-    totalAmount = baseAmount + igstAmount;
-  } else {
-    cgstAmount = baseAmount * 0.025;
-    sgstAmount = baseAmount * 0.025;
-    totalAmount = baseAmount + cgstAmount + sgstAmount;
-  }
+  // Amount saved in CRM is GST-inclusive. Invoice shows taxable value + GST split.
+  const totalAmount = project.amount;
+  const taxableAmount = roundCurrency(totalAmount / 1.05);
+  const gstAmount = roundCurrency(totalAmount - taxableAmount);
+  const igstAmount = gstType === "igst" ? gstAmount : 0;
+  const cgstAmount = gstType === "cgst-sgst" ? roundCurrency(gstAmount / 2) : 0;
+  const sgstAmount =
+    gstType === "cgst-sgst" ? roundCurrency(gstAmount - cgstAmount) : 0;
 
   const containerClass = forPrint
     ? "bg-white text-black p-12 w-full print:p-12"
@@ -72,12 +63,6 @@ export default function InvoiceContent({
             <p className="mt-3">
               <span className="font-bold">GSTIN/UIN:</span> {COMPANY_INFO.gstin}
             </p>
-            <p>
-              <span className="font-bold">PAN:</span> {COMPANY_INFO.pan}
-            </p>
-            <p>
-              <span className="font-bold">LLPIN:</span> {COMPANY_INFO.llpin}
-            </p>
           </div>
         </div>
 
@@ -101,7 +86,7 @@ export default function InvoiceContent({
             <p className="font-bold text-lg">{invoiceNo}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-600 font-bold">Date:</p>
+            <p className="text-xs text-gray-600 font-bold">Invoice Date:</p>
             <p className="font-semibold">{project.invoiceDate || project.createdAt}</p>
           </div>
           <div>
@@ -184,7 +169,7 @@ export default function InvoiceContent({
               {project.batteryNo || "-"}
             </td>
             <td className="border border-gray-400 px-3 py-2 text-xs text-right font-semibold text-gray-800">
-              {baseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              {taxableAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </td>
           </tr>
         </tbody>
@@ -195,9 +180,9 @@ export default function InvoiceContent({
         <div></div>
         <div className="space-y-3">
           <div className="flex justify-between text-sm border-b-2 border-gray-300 pb-2">
-            <span className="font-semibold text-gray-800">Total Value</span>
+            <span className="font-semibold text-gray-800">Taxable Value</span>
             <span className="font-bold text-gray-800">
-              {baseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              {taxableAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </span>
           </div>
           {gstType === "igst" ? (
@@ -346,6 +331,10 @@ function formatAmountInWords(amount: number): string {
   }
 
   return result.trim() + " Rupees Only";
+}
+
+function roundCurrency(value: number): number {
+  return Number(value.toFixed(2));
 }
 
 function convertHundreds(
