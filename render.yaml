@@ -2,7 +2,7 @@ services:
   - type: static
     name: axigear-crm
     env: static
-    buildCommand: npm install && npm run build:client
+    buildCommand: pnpm install && pnpm run build:client
     staticPublishPath: dist/spa
     pullRequestPreviewsEnabled: true
     envVars:
@@ -11,5 +11,7 @@ services:
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
     routes:
+      - path: /api/*
+        destination: /api
       - path: /*
         destination: /index.html
