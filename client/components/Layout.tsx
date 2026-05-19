@@ -91,6 +91,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               Admin
             </Link>
+            <Link
+              to="/admin-settings"
+              className="text-sm font-medium transition-colors hover:text-primary"
+              title="Admin Settings"
+            >
+              ⚙️
+            </Link>
             <button
               onClick={handleLogout}
               className="inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-destructive"
@@ -147,6 +154,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Admin
+              </Link>
+              <Link
+                to="/admin-settings"
+                className="text-sm font-medium transition-colors hover:text-primary"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Settings
               </Link>
               <button
                 onClick={() => {

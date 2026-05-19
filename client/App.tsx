@@ -15,6 +15,7 @@ import Invoice from "./pages/Invoice";
 import Attendance from "./pages/Attendance";
 import Inventory from "./pages/Inventory";
 import AdminEmployees from "./pages/AdminEmployees";
+import AdminSettings from "./pages/AdminSettings";
 import NotFound from "./pages/NotFound";
 import { hydrateAuthTokenFromSupabase, isAuthenticated } from "./lib/auth";
 import { supabase } from "./lib/supabase";
@@ -44,6 +45,7 @@ function AppRoutesContent() {
       <Route path="/attendance" element={<ProtectedRoute element={<Attendance />} />} />
       <Route path="/inventory" element={<ProtectedRoute element={<Inventory />} />} />
       <Route path="/admin-employees" element={<ProtectedRoute element={<AdminEmployees />} />} />
+      <Route path="/admin-settings" element={<ProtectedRoute element={<AdminSettings />} />} />
       <Route
         path="/estimation-slip/:estimationId"
         element={<ProtectedRoute element={<EstimationSlip />} />}
