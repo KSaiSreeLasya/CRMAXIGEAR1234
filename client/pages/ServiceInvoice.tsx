@@ -16,6 +16,17 @@ interface ServiceInvoiceRecord {
   productDescription: string;
   invoiceDate: string;
   amount: number;
+  unit: number;
+  total: number;
+  createdAt: string;
+}
+
+interface SpareItem {
+  id: string;
+  partName: string;
+  price: number;
+  qty: number;
+  total: number;
   createdAt: string;
 }
 
@@ -28,6 +39,8 @@ const DEFAULT_FORM = {
   productDescription: "",
   invoiceDate: "",
   amount: "",
+  unit: "",
+  total: "",
 };
 
 function getNextServiceInvoiceNumber(): string {
@@ -69,15 +82,18 @@ function getNextServiceInvoiceNumber(): string {
 export default function ServiceInvoice() {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<ServiceInvoiceRecord[]>([]);
+  const [spares, setSpares] = useState<SpareItem[]>([]);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSpares, setIsLoadingSpares] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [gstType, setGstType] = useState<"igst" | "cgst-sgst">("cgst-sgst");
 
   useEffect(() => {
     void loadInvoices();
+    void loadSpares();
     // Auto-set invoice number when not editing
     if (!editingId) {
       setForm((prev) => ({
@@ -108,6 +124,8 @@ export default function ServiceInvoice() {
               productDescription: row.product_description || "",
               invoiceDate: row.invoice_date || "",
               amount: row.amount || 0,
+              unit: row.unit || 1,
+              total: row.total || 0,
               createdAt: new Date(row.created_at).toLocaleDateString(),
             })) || [];
           setInvoices(rows);
@@ -125,11 +143,51 @@ export default function ServiceInvoice() {
     }
   };
 
+  const loadSpares = async () => {
+    setIsLoadingSpares(true);
+    try {
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("spares_inventory")
+            .select("*")
+            .gt("qty", 0)
+            .order("part_name", { ascending: true });
+          if (error) throw error;
+          const rows: SpareItem[] =
+            data?.map((row: any) => ({
+              id: row.id,
+              partName: row.part_name || "",
+              price: row.price || 0,
+              qty: row.qty || 0,
+              total: row.total || 0,
+              createdAt: new Date(row.created_at).toLocaleDateString(),
+            })) || [];
+          setSpares(rows);
+          return;
+        } catch (supabaseError: any) {
+          console.warn("Supabase spares load failed, falling back to localStorage:", supabaseError?.message);
+        }
+      }
+      const raw = localStorage.getItem("crm_spares");
+      if (raw) {
+        const parsed = JSON.parse(raw) as SpareItem[];
+        setSpares(parsed.filter(s => s.qty > 0));
+      }
+    } catch (error) {
+      console.error("Error loading spares:", error);
+    } finally {
+      setIsLoadingSpares(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
       const amount = Number(form.amount || 0);
+      const unit = Number(form.unit || 1);
+      const total = amount * unit;
 
       const payload = {
         serviceInvoiceNo: form.serviceInvoiceNo.trim(),
@@ -140,6 +198,8 @@ export default function ServiceInvoice() {
         productDescription: form.productDescription.trim(),
         invoiceDate: form.invoiceDate,
         amount,
+        unit,
+        total,
       };
 
       if (editingId) {
@@ -155,6 +215,8 @@ export default function ServiceInvoice() {
               product_description: payload.productDescription,
               invoice_date: payload.invoiceDate,
               amount: payload.amount,
+              unit: payload.unit,
+              total: payload.total,
             })
             .eq("id", editingId);
           if (error) throw error;
@@ -178,6 +240,12 @@ export default function ServiceInvoice() {
             if (!userData.user?.id) {
               throw new Error("User not authenticated");
             }
+
+            const selectedSpare = spares.find(s => s.partName === form.product);
+            if (selectedSpare && unit > selectedSpare.qty) {
+              throw new Error(`Insufficient inventory. Available: ${selectedSpare.qty}`);
+            }
+
             const { data, error } = await supabase
               .from("service_invoices")
               .insert([
@@ -191,11 +259,25 @@ export default function ServiceInvoice() {
                   product_description: payload.productDescription,
                   invoice_date: payload.invoiceDate,
                   amount: payload.amount,
+                  unit: payload.unit,
+                  total: payload.total,
                 },
               ])
               .select()
               .single();
             if (error) throw error;
+
+            if (selectedSpare) {
+              const newQty = selectedSpare.qty - unit;
+              const { error: updateError } = await supabase
+                .from("spares_inventory")
+                .update({ qty: newQty })
+                .eq("id", selectedSpare.id);
+              if (updateError) console.warn("Error updating spare inventory:", updateError);
+              else {
+                await loadSpares();
+              }
+            }
 
             created = {
               id: data.id,
@@ -207,6 +289,8 @@ export default function ServiceInvoice() {
               productDescription: data.product_description,
               invoiceDate: data.invoice_date,
               amount: data.amount,
+              unit: data.unit,
+              total: data.total,
               createdAt: new Date(data.created_at).toLocaleDateString(),
             };
             setInvoices((prev) => [created, ...prev]);
@@ -220,8 +304,22 @@ export default function ServiceInvoice() {
             const updated = [created, ...invoices];
             setInvoices(updated);
             localStorage.setItem("crm_service_invoices", JSON.stringify(updated));
+
+            const selectedSpare = spares.find(s => s.partName === form.product);
+            if (selectedSpare && unit <= selectedSpare.qty) {
+              const updatedSpares = spares.map(s =>
+                s.id === selectedSpare.id ? { ...s, qty: s.qty - unit } : s
+              );
+              setSpares(updatedSpares);
+              localStorage.setItem("crm_spares", JSON.stringify(updatedSpares));
+            }
           }
         } else {
+          const selectedSpare = spares.find(s => s.partName === form.product);
+          if (selectedSpare && unit > selectedSpare.qty) {
+            throw new Error(`Insufficient inventory. Available: ${selectedSpare.qty}`);
+          }
+
           created = {
             id: `service_invoice_${Date.now()}`,
             createdAt: new Date().toLocaleDateString(),
@@ -230,6 +328,14 @@ export default function ServiceInvoice() {
           const updated = [created, ...invoices];
           setInvoices(updated);
           localStorage.setItem("crm_service_invoices", JSON.stringify(updated));
+
+          if (selectedSpare) {
+            const updatedSpares = spares.map(s =>
+              s.id === selectedSpare.id ? { ...s, qty: s.qty - unit } : s
+            );
+            setSpares(updatedSpares);
+            localStorage.setItem("crm_spares", JSON.stringify(updatedSpares));
+          }
         }
       }
 
@@ -274,6 +380,8 @@ export default function ServiceInvoice() {
       productDescription: item.productDescription,
       invoiceDate: item.invoiceDate,
       amount: String(item.amount),
+      unit: String(item.unit),
+      total: String(item.total),
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -367,12 +475,32 @@ export default function ServiceInvoice() {
               value={form.location}
               onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
             />
-            <input
+            <select
               className="px-4 py-2 border border-border rounded-lg bg-background"
-              placeholder="Product"
               value={form.product}
-              onChange={(e) => setForm((prev) => ({ ...prev, product: e.target.value }))}
-            />
+              onChange={(e) => {
+                const selected = spares.find(s => s.partName === e.target.value);
+                setForm((prev) => ({
+                  ...prev,
+                  product: e.target.value,
+                  amount: String(selected?.price || 0),
+                }));
+              }}
+              required
+            >
+              <option value="">Select Product</option>
+              {isLoadingSpares ? (
+                <option>Loading spares...</option>
+              ) : spares.length === 0 ? (
+                <option>No spares available</option>
+              ) : (
+                spares.map((spare) => (
+                  <option key={spare.id} value={spare.partName}>
+                    {spare.partName} - Qty: {spare.qty} - ₹{spare.price.toFixed(2)}
+                  </option>
+                ))
+              )}
+            </select>
             <input
               className="px-4 py-2 border border-border rounded-lg bg-background"
               placeholder="Product Description"
@@ -392,8 +520,44 @@ export default function ServiceInvoice() {
               type="number"
               step="0.01"
               value={form.amount}
-              onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+              onChange={(e) => {
+                const newAmount = e.target.value;
+                const unit = Number(form.unit || 1);
+                const total = Number(newAmount) * unit;
+                setForm((prev) => ({
+                  ...prev,
+                  amount: newAmount,
+                  total: String(total),
+                }));
+              }}
               required
+            />
+            <input
+              className="px-4 py-2 border border-border rounded-lg bg-background"
+              placeholder="Unit"
+              type="number"
+              step="1"
+              value={form.unit}
+              onChange={(e) => {
+                const newUnit = e.target.value;
+                const amount = Number(form.amount || 0);
+                const total = amount * Number(newUnit);
+                setForm((prev) => ({
+                  ...prev,
+                  unit: newUnit,
+                  total: String(total),
+                }));
+              }}
+              required
+            />
+            <input
+              className="px-4 py-2 border border-border rounded-lg bg-background text-gray-500 cursor-not-allowed"
+              placeholder="Total"
+              type="number"
+              step="0.01"
+              value={form.total}
+              readOnly
+              disabled
             />
             <button
               type="submit"
@@ -433,6 +597,8 @@ export default function ServiceInvoice() {
                     <th className="px-4 py-2 text-left">Product</th>
                     <th className="px-4 py-2 text-left">Date</th>
                     <th className="px-4 py-2 text-right">Amount</th>
+                    <th className="px-4 py-2 text-center">Unit</th>
+                    <th className="px-4 py-2 text-right">Total</th>
                     <th className="px-4 py-2 text-left">Action</th>
                   </tr>
                 </thead>
@@ -446,6 +612,8 @@ export default function ServiceInvoice() {
                       <td className="px-4 py-2">{invoice.product}</td>
                       <td className="px-4 py-2">{invoice.invoiceDate}</td>
                       <td className="px-4 py-2 text-right font-semibold">₹{invoice.amount.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-center">{invoice.unit}</td>
+                      <td className="px-4 py-2 text-right font-semibold">₹{invoice.total.toFixed(2)}</td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           <button
