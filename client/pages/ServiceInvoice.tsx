@@ -526,48 +526,64 @@ export default function ServiceInvoice() {
           <form onSubmit={handleSave} className="space-y-6">
             {/* Header Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                className="px-4 py-2 border border-border rounded-lg bg-background text-gray-500 cursor-not-allowed"
-                placeholder="Auto-generated"
-                value={form.serviceInvoiceNo}
-                readOnly
-                disabled
-              />
-              <input
-                className="px-4 py-2 border border-border rounded-lg bg-background"
-                placeholder="Customer Name"
-                value={form.customerName}
-                onChange={(e) => setForm((prev) => ({ ...prev, customerName: e.target.value }))}
-                required
-              />
-              <input
-                className="px-4 py-2 border border-border rounded-lg bg-background"
-                placeholder="Contact No"
-                value={form.contactNo}
-                onChange={(e) => setForm((prev) => ({ ...prev, contactNo: e.target.value }))}
-              />
-              <input
-                className="px-4 py-2 border border-border rounded-lg bg-background"
-                placeholder="Location"
-                value={form.location}
-                onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-              />
-              <input
-                className="px-4 py-2 border border-border rounded-lg bg-background"
-                placeholder="Invoice Date"
-                type="date"
-                value={form.invoiceDate}
-                onChange={(e) => setForm((prev) => ({ ...prev, invoiceDate: e.target.value }))}
-                required
-              />
-              <input
-                className="px-4 py-2 border border-border rounded-lg bg-background"
-                placeholder="Labour Charges"
-                type="number"
-                step="0.01"
-                value={form.labourCharges}
-                onChange={(e) => setForm((prev) => ({ ...prev, labourCharges: Number(e.target.value) }))}
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Invoice No</label>
+                <input
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-gray-500 cursor-not-allowed"
+                  placeholder="Auto-generated"
+                  value={form.serviceInvoiceNo}
+                  readOnly
+                  disabled
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Customer Name *</label>
+                <input
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background"
+                  placeholder="Customer Name"
+                  value={form.customerName}
+                  onChange={(e) => setForm((prev) => ({ ...prev, customerName: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Contact No</label>
+                <input
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background"
+                  placeholder="Contact No"
+                  value={form.contactNo}
+                  onChange={(e) => setForm((prev) => ({ ...prev, contactNo: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Location</label>
+                <input
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background"
+                  placeholder="Location"
+                  value={form.location}
+                  onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Invoice Date *</label>
+                <input
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background"
+                  type="date"
+                  value={form.invoiceDate}
+                  onChange={(e) => setForm((prev) => ({ ...prev, invoiceDate: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Labour Charges</label>
+                <input
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background"
+                  type="number"
+                  step="0.01"
+                  value={form.labourCharges}
+                  onChange={(e) => setForm((prev) => ({ ...prev, labourCharges: Number(e.target.value) }))}
+                />
+              </div>
             </div>
 
             {/* GST Toggle */}
