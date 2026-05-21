@@ -248,15 +248,24 @@ export default function Inventory() {
         persistLocal(next);
       } else {
         if (supabase) {
-          const { data: userData } = await supabase.auth.getUser();
-          if (!userData.user?.id) {
+          let userId: string | undefined;
+
+          if (employeeSession) {
+            userId = employeeSession.employeeId;
+          } else {
+            const { data: userData } = await supabase.auth.getUser();
+            userId = userData.user?.id;
+          }
+
+          if (!userId) {
             throw new Error("User not authenticated");
           }
+
           const { data, error } = await supabase
             .from("inventory_items")
             .insert([
               {
-                user_id: userData.user.id,
+                user_id: userId,
                 sl_no: payload.slNo,
                 model_no: payload.modelNo || null,
                 brand: payload.brand || null,
@@ -400,15 +409,24 @@ export default function Inventory() {
         let created: SpareItem;
         if (supabase) {
           try {
-            const { data: userData } = await supabase.auth.getUser();
-            if (!userData.user?.id) {
+            let userId: string | undefined;
+
+            if (employeeSession) {
+              userId = employeeSession.employeeId;
+            } else {
+              const { data: userData } = await supabase.auth.getUser();
+              userId = userData.user?.id;
+            }
+
+            if (!userId) {
               throw new Error("User not authenticated");
             }
+
             const { data, error } = await supabase
               .from("spares_inventory")
               .insert([
                 {
-                  user_id: userData.user.id,
+                  user_id: userId,
                   part_name: payload.partName,
                   price: payload.price,
                   qty: payload.qty,
