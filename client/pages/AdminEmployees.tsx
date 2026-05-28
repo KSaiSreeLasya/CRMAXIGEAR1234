@@ -45,24 +45,35 @@ export default function AdminEmployees() {
     setIsLoading(true);
     try {
       if (supabase) {
-        const { data, error } = await supabase
-          .from("employees")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (error) throw error;
+        try {
+          const { data, error } = await supabase
+            .from("employees")
+            .select("*")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
 
-        const rows: Employee[] =
-          data?.map((row: any) => ({
-            id: row.id,
-            fullName: row.full_name,
-            email: row.email || "",
-            phone: row.phone || "",
-            role: row.role || "",
-            isActive: row.is_active ?? true,
-            createdAt: new Date(row.created_at).toLocaleDateString(),
-          })) || [];
-        setEmployees(rows);
-        return;
+          const rows: Employee[] =
+            data?.map((row: any) => ({
+              id: row.id,
+              fullName: row.full_name,
+              email: row.email || "",
+              phone: row.phone || "",
+              role: row.role || "",
+              isActive: row.is_active ?? true,
+              createdAt: new Date(row.created_at).toLocaleDateString(),
+            })) || [];
+          setEmployees(rows);
+          console.log(`✅ Loaded ${rows.length} employees from Supabase`);
+          return;
+        } catch (supabaseError: any) {
+          console.error("Supabase error loading employees:", supabaseError?.message);
+          const raw = localStorage.getItem("crm_employees");
+          if (raw) {
+            setEmployees(JSON.parse(raw));
+            console.log("Loaded from localStorage fallback");
+          }
+          return;
+        }
       }
 
       const raw = localStorage.getItem("crm_employees");

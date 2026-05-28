@@ -97,6 +97,7 @@ export default function Inventory() {
             .select("*")
             .order("sl_no", { ascending: true });
           if (error) throw error;
+          console.log(`Loaded ${data?.length || 0} inventory items from Supabase`);
           const rows: InventoryItem[] =
             data?.map((row: any) => ({
               id: row.id,
@@ -177,13 +178,18 @@ export default function Inventory() {
               };
             }) || [];
           setSpares(rows);
+          console.log(`Loaded ${rows.length} spares from Supabase`);
           return;
         } catch (supabaseError: any) {
-          console.warn("Supabase spares load failed (table may not exist), falling back to localStorage:", supabaseError?.message);
+          console.warn("Supabase spares load failed:", supabaseError?.message);
+          console.log("Falling back to localStorage");
         }
       }
       const raw = localStorage.getItem("crm_spares_inventory");
-      if (raw) setSpares(JSON.parse(raw));
+      if (raw) {
+        setSpares(JSON.parse(raw));
+        console.log("Loaded spares from localStorage");
+      }
     } catch (error) {
       console.error("Error loading spares from localStorage:", error);
     } finally {
@@ -440,6 +446,7 @@ export default function Inventory() {
               throw new Error("User not authenticated");
             }
 
+            console.log(`Attempting to save spare to Supabase with userId: ${userId}`);
             const { data, error } = await supabase
               .from("spares_inventory")
               .insert([
@@ -454,6 +461,7 @@ export default function Inventory() {
               .single();
             if (error) throw error;
 
+            console.log("Spare saved to Supabase:", data);
             created = {
               id: data.id,
               partName: data.part_name,
@@ -464,7 +472,7 @@ export default function Inventory() {
             };
             setSpares((prev) => [created, ...prev]);
           } catch (supabaseError: any) {
-            console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
+            console.warn("Supabase insert failed, saving to localStorage instead:", supabaseError?.message);
             created = {
               id: `spare_${Date.now()}`,
               createdAt: new Date().toLocaleDateString(),
@@ -473,6 +481,7 @@ export default function Inventory() {
             const updated = [created, ...spares];
             setSpares(updated);
             localStorage.setItem("crm_spares_inventory", JSON.stringify(updated));
+            console.log("Saved to localStorage:", created);
           }
         } else {
           created = {
