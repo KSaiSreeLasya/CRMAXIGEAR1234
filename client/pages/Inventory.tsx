@@ -645,15 +645,19 @@ export default function Inventory() {
         throw new Error("User not authenticated");
       }
 
+      // Calculate starting sl.no from existing items
+      const maxSlNo = items.length > 0 ? Math.max(...items.map(item => item.slNo)) : 0;
+
       const newItems: InventoryItem[] = [];
-      const itemsToInsert = importedItems.map((item) => {
+      const itemsToInsert = importedItems.map((item, index) => {
         const vehicleCount = Number(item.vehicleCount || 0);
         const salesCount = Number(item.salesCount || 0);
         const closingStock = vehicleCount - salesCount;
+        const continuousSlNo = maxSlNo + index + 1;
 
         return {
           user_id: userId,
-          sl_no: Number(item.slNo || 0),
+          sl_no: continuousSlNo,
           model_no: item.modelNo || null,
           brand: item.brand || null,
           vehicle_model: item.vehicleModel || null,
@@ -701,14 +705,15 @@ export default function Inventory() {
           });
         } catch (supabaseError: any) {
           console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
-          importedItems.forEach((item) => {
+          importedItems.forEach((item, index) => {
             const vehicleCount = Number(item.vehicleCount || 0);
             const salesCount = Number(item.salesCount || 0);
             const closingStock = vehicleCount - salesCount;
+            const continuousSlNo = maxSlNo + index + 1;
 
             const invItem: InventoryItem = {
               id: `inventory_${Date.now()}_${Math.random()}`,
-              slNo: Number(item.slNo || 0),
+              slNo: continuousSlNo,
               modelNo: item.modelNo || "",
               brand: item.brand || "",
               vehicleModel: item.vehicleModel || "",

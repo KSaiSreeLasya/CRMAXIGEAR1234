@@ -10,6 +10,8 @@ interface ImportExportProps {
   exportHeaders: string[];
   filename: string;
   title: string;
+  showCsvExport?: boolean;
+  showPdfExport?: boolean;
 }
 
 export function ImportExport({
@@ -19,6 +21,8 @@ export function ImportExport({
   exportHeaders,
   filename,
   title,
+  showCsvExport = false,
+  showPdfExport = false,
 }: ImportExportProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -89,17 +93,19 @@ export function ImportExport({
         </div>
 
         {/* Export Buttons */}
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2"
-          onClick={() => exportToCSV(data, exportHeaders, filename)}
-          disabled={data.length === 0}
-          title={`Download ${dataType} as CSV`}
-        >
-          <Download className="w-4 h-4" />
-          Export CSV
-        </Button>
+        {showCsvExport && (
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={() => exportToCSV(data, exportHeaders, filename)}
+            disabled={data.length === 0}
+            title={`Download ${dataType} as CSV`}
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </Button>
+        )}
 
         <Button
           type="button"
@@ -113,17 +119,19 @@ export function ImportExport({
           Export Excel
         </Button>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2"
-          onClick={() => exportToPDF(data, exportHeaders, `${filename}.pdf`, title)}
-          disabled={data.length === 0}
-          title={`Download ${dataType} as PDF`}
-        >
-          <Download className="w-4 h-4" />
-          Export PDF
-        </Button>
+        {showPdfExport && (
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={() => exportToPDF(data, exportHeaders, `${filename}.pdf`, title)}
+            disabled={data.length === 0}
+            title={`Download ${dataType} as PDF`}
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </Button>
+        )}
       </div>
 
       {/* Help text */}
