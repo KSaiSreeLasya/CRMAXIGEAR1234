@@ -7,6 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import CreateProjectModal from "@/components/CreateProjectModal";
 import EditProjectModal from "@/components/EditProjectModal";
 import { supabase } from "@/lib/supabase";
+import { ImportExport } from "@/components/ImportExport";
 
 interface EstimationRecord {
   id: string;
@@ -513,6 +514,183 @@ export default function Projects() {
     }).format(amount);
   };
 
+  const handleImportProjects = async (importedItems: Record<string, any>[]) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      if (!userId && supabase) {
+        throw new Error("User not authenticated");
+      }
+
+      const newProjects: Project[] = [];
+      const projectsToInsert = importedItems.map((item) => ({
+        user_id: userId,
+        model_no: item.modelNo || null,
+        customer_name: item.customerName,
+        contact_no: item.contactNo,
+        location: item.location,
+        product_description: item.productDescription,
+        hsn_no: item.hsnNo,
+        chassis_no: item.chassisNo,
+        motor_no: item.motorNo || null,
+        battery_no: item.batteryNo || null,
+        battery_warranty: item.batteryWarranty || null,
+        battery_capacity: item.batteryCapacity || null,
+        vehicle_warranty: item.vehicleWarranty || null,
+        invoice_date: item.invoiceDate,
+        amount: Number(item.amount || 0),
+        mode_of_payment: item.modeOfPayment || "Cash",
+        lead_source: item.leadSource || null,
+      }));
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("projects")
+            .insert(projectsToInsert)
+            .select();
+
+          if (error) throw error;
+
+          data?.forEach((row: any) => {
+            newProjects.push({
+              id: row.id,
+              modelNo: row.model_no || "",
+              customerName: row.customer_name,
+              contactNo: row.contact_no,
+              location: row.location,
+              productDescription: row.product_description,
+              hsnNo: row.hsn_no,
+              chassisNo: row.chassis_no,
+              motorNo: row.motor_no || "",
+              batteryNo: row.battery_no || "",
+              batteryWarranty: row.battery_warranty || "",
+              batteryCapacity: row.battery_capacity || "",
+              vehicleWarranty: row.vehicle_warranty || "",
+              invoiceDate: row.invoice_date || "",
+              amount: row.amount,
+              modeOfPayment: row.mode_of_payment || "Cash",
+              leadSource: row.lead_source || "",
+              createdAt: new Date(row.created_at).toLocaleDateString(),
+            });
+          });
+        } catch (supabaseError: any) {
+          console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
+          importedItems.forEach((item) => {
+            const project: Project = {
+              id: `project_${Date.now()}_${Math.random()}`,
+              modelNo: item.modelNo || "",
+              customerName: item.customerName,
+              contactNo: item.contactNo,
+              location: item.location,
+              productDescription: item.productDescription,
+              hsnNo: item.hsnNo,
+              chassisNo: item.chassisNo,
+              motorNo: item.motorNo || "",
+              batteryNo: item.batteryNo || "",
+              batteryWarranty: item.batteryWarranty || "",
+              batteryCapacity: item.batteryCapacity || "",
+              vehicleWarranty: item.vehicleWarranty || "",
+              invoiceDate: item.invoiceDate,
+              amount: Number(item.amount || 0),
+              modeOfPayment: item.modeOfPayment || "Cash",
+              leadSource: item.leadSource || "",
+              createdAt: new Date().toLocaleDateString(),
+            };
+            newProjects.push(project);
+          });
+        }
+      }
+
+      const updated = [...newProjects, ...projects];
+      setProjects(updated);
+      localStorage.setItem("crm_projects", JSON.stringify(updated));
+      alert(`Successfully imported ${newProjects.length} project(s)`);
+    } catch (error: any) {
+      console.error("Error importing projects:", error);
+      throw error;
+    }
+  };
+
+  const handleImportEstimations = async (importedItems: Record<string, any>[]) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      if (!userId && supabase) {
+        throw new Error("User not authenticated");
+      }
+
+      const newEstimations: EstimationRecord[] = [];
+      const estimationsToInsert = importedItems.map((item) => ({
+        user_id: userId,
+        estimation_slip_no: item.estimationSlipNo,
+        customer_name: item.customerName,
+        contact_no: item.contactNo,
+        address: item.address,
+        estimation_date: item.estimationDate,
+        model: item.model,
+        amount: Number(item.amount || 0),
+        mode_of_payment: item.modeOfPayment || "Cash",
+        lead_source: item.leadSource || null,
+      }));
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("estimations")
+            .insert(estimationsToInsert)
+            .select();
+
+          if (error) throw error;
+
+          data?.forEach((row: any) => {
+            newEstimations.push({
+              id: row.id,
+              estimationSlipNo: row.estimation_slip_no || "",
+              customerName: row.customer_name || "",
+              contactNo: row.contact_no || "",
+              address: row.address || "",
+              estimationDate: row.estimation_date || "",
+              model: row.model || "",
+              amount: row.amount || 0,
+              modeOfPayment: row.mode_of_payment || "Cash",
+              leadSource: row.lead_source || "",
+              createdAt: new Date(row.created_at).toLocaleDateString(),
+            });
+          });
+        } catch (supabaseError: any) {
+          console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
+          importedItems.forEach((item) => {
+            const estimation: EstimationRecord = {
+              id: `estimation_${Date.now()}_${Math.random()}`,
+              estimationSlipNo: item.estimationSlipNo,
+              customerName: item.customerName,
+              contactNo: item.contactNo,
+              address: item.address,
+              estimationDate: item.estimationDate,
+              model: item.model,
+              amount: Number(item.amount || 0),
+              modeOfPayment: item.modeOfPayment || "Cash",
+              leadSource: item.leadSource || "",
+              createdAt: new Date().toLocaleDateString(),
+            };
+            newEstimations.push(estimation);
+          });
+        }
+      }
+
+      const updated = [...newEstimations, ...estimations];
+      setEstimations(updated);
+      localStorage.setItem("crm_estimations", JSON.stringify(updated));
+      alert(`Successfully imported ${newEstimations.length} estimation(s)`);
+    } catch (error: any) {
+      console.error("Error importing estimations:", error);
+      throw error;
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12">
@@ -552,6 +730,18 @@ export default function Projects() {
 
             {/* Projects Tab */}
             <TabsContent value="projects" className="space-y-6">
+              <div className="bg-card rounded-lg border border-border p-6">
+                <h2 className="text-xl font-semibold mb-4">Import/Export Projects</h2>
+                <ImportExport
+                  data={projects}
+                  onImport={handleImportProjects}
+                  dataType="projects"
+                  exportHeaders={["modelNo", "customerName", "contactNo", "location", "productDescription", "hsnNo", "chassisNo", "motorNo", "batteryNo", "batteryWarranty", "batteryCapacity", "vehicleWarranty", "invoiceDate", "amount", "modeOfPayment", "leadSource"]}
+                  filename="projects.csv"
+                  title="Sales Projects"
+                />
+              </div>
+
               {isLoading ? (
                 <div className="bg-card rounded-lg border border-border p-12 text-center">
                   <div className="space-y-4 max-w-md mx-auto">
@@ -693,6 +883,18 @@ export default function Projects() {
 
             {/* Sales Pipeline Tab */}
             <TabsContent value="sales" className="space-y-6">
+              <div className="bg-card rounded-lg border border-border p-6">
+                <h2 className="text-xl font-semibold mb-4">Import/Export Estimations</h2>
+                <ImportExport
+                  data={estimations}
+                  onImport={handleImportEstimations}
+                  dataType="estimations"
+                  exportHeaders={["estimationSlipNo", "customerName", "contactNo", "address", "estimationDate", "model", "amount", "modeOfPayment", "leadSource"]}
+                  filename="estimations.csv"
+                  title="Sales Pipeline Estimations"
+                />
+              </div>
+
               <div className="bg-card rounded-lg border border-border p-6">
                 <h2 className="text-xl font-semibold mb-4">
                   {editingEstimationId ? "Edit Estimation" : "Add Estimation"}

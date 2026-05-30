@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { getEmployeeSession, isAdminUser } from "@/lib/auth";
 import { SpareImportExport } from "@/components/SpareImportExport";
+import { ImportExport } from "@/components/ImportExport";
 
 interface InventoryItem {
   id: string;
@@ -625,6 +626,149 @@ export default function Inventory() {
     }
   };
 
+  const handleImportInventory = async (importedItems: Record<string, any>[]) => {
+    try {
+      let userId: string | undefined;
+
+      if (employeeSession) {
+        userId = employeeSession.employeeId;
+      } else {
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          userId = userData.user?.id;
+        } catch (err) {
+          console.warn("Could not fetch Supabase user:", err);
+        }
+      }
+
+      if (!userId && supabase) {
+        throw new Error("User not authenticated");
+      }
+
+      // Calculate starting sl.no from existing items
+      const maxSlNo = items.length > 0 ? Math.max(...items.map(item => item.slNo)) : 0;
+
+      const newItems: InventoryItem[] = [];
+      const itemsToInsert = importedItems.map((item, index) => {
+        const vehicleCount = Number(item.vehicleCount || 0);
+        const salesCount = Number(item.salesCount || 0);
+        const closingStock = vehicleCount - salesCount;
+        const continuousSlNo = maxSlNo + index + 1;
+
+        return {
+          user_id: userId,
+          sl_no: continuousSlNo,
+          model_no: item.modelNo || null,
+          brand: item.brand || null,
+          vehicle_model: item.vehicleModel || null,
+          hsn_no: item.hsnNo || null,
+          vehicle_count: vehicleCount,
+          chassis_no: item.chassisNo || null,
+          motor_no: item.motorNo || null,
+          battery_no: item.batteryNo || null,
+          manufacturer_inv_no: item.manufacturerInvNo || null,
+          battery_model: item.batteryModel || null,
+          battery_count: Number(item.batteryCount || 0),
+          sales_count: salesCount,
+          closing_stock: closingStock,
+        };
+      });
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("inventory_items")
+            .insert(itemsToInsert)
+            .select();
+
+          if (error) throw error;
+
+          data?.forEach((row: any) => {
+            newItems.push({
+              id: row.id,
+              slNo: row.sl_no,
+              modelNo: row.model_no || "",
+              brand: row.brand || "",
+              vehicleModel: row.vehicle_model || "",
+              hsnNo: row.hsn_no || "",
+              vehicleCount: row.vehicle_count || 0,
+              chassisNo: row.chassis_no || "",
+              motorNo: row.motor_no || "",
+              batteryNo: row.battery_no || "",
+              manufacturerInvNo: row.manufacturer_inv_no || "",
+              batteryModel: row.battery_model || "",
+              batteryCount: row.battery_count || 0,
+              salesCount: row.sales_count || 0,
+              closingStock: row.closing_stock || 0,
+              createdAt: new Date(row.created_at).toLocaleDateString(),
+            });
+          });
+        } catch (supabaseError: any) {
+          console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
+          importedItems.forEach((item, index) => {
+            const vehicleCount = Number(item.vehicleCount || 0);
+            const salesCount = Number(item.salesCount || 0);
+            const closingStock = vehicleCount - salesCount;
+            const continuousSlNo = maxSlNo + index + 1;
+
+            const invItem: InventoryItem = {
+              id: `inventory_${Date.now()}_${Math.random()}`,
+              slNo: continuousSlNo,
+              modelNo: item.modelNo || "",
+              brand: item.brand || "",
+              vehicleModel: item.vehicleModel || "",
+              hsnNo: item.hsnNo || "",
+              vehicleCount,
+              chassisNo: item.chassisNo || "",
+              motorNo: item.motorNo || "",
+              batteryNo: item.batteryNo || "",
+              manufacturerInvNo: item.manufacturerInvNo || "",
+              batteryModel: item.batteryModel || "",
+              batteryCount: Number(item.batteryCount || 0),
+              salesCount,
+              closingStock,
+              createdAt: new Date().toLocaleDateString(),
+            };
+            newItems.push(invItem);
+          });
+        }
+      } else {
+        importedItems.forEach((item) => {
+          const vehicleCount = Number(item.vehicleCount || 0);
+          const salesCount = Number(item.salesCount || 0);
+          const closingStock = vehicleCount - salesCount;
+
+          const invItem: InventoryItem = {
+            id: `inventory_${Date.now()}_${Math.random()}`,
+            slNo: Number(item.slNo || 0),
+            modelNo: item.modelNo || "",
+            brand: item.brand || "",
+            vehicleModel: item.vehicleModel || "",
+            hsnNo: item.hsnNo || "",
+            vehicleCount,
+            chassisNo: item.chassisNo || "",
+            motorNo: item.motorNo || "",
+            batteryNo: item.batteryNo || "",
+            manufacturerInvNo: item.manufacturerInvNo || "",
+            batteryModel: item.batteryModel || "",
+            batteryCount: Number(item.batteryCount || 0),
+            salesCount,
+            closingStock,
+            createdAt: new Date().toLocaleDateString(),
+          };
+          newItems.push(invItem);
+        });
+      }
+
+      const updated = [...newItems, ...items].sort((a, b) => a.slNo - b.slNo);
+      persistLocal(updated);
+      alert(`Successfully imported ${newItems.length} inventory item(s)`);
+    } catch (error: any) {
+      console.error("Error importing inventory:", error);
+      throw error;
+    }
+  };
+
 
   return (
     <Layout>
@@ -647,6 +791,18 @@ export default function Inventory() {
 
           {/* Sales Vehicles Inventory Tab */}
           <TabsContent value="vehicles" className="space-y-6">
+            <div className="bg-card rounded-lg border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Import/Export Inventory</h2>
+              <ImportExport
+                data={items}
+                onImport={handleImportInventory}
+                dataType="inventory"
+                exportHeaders={["slNo", "modelNo", "brand", "vehicleModel", "hsnNo", "vehicleCount", "chassisNo", "motorNo", "batteryNo", "manufacturerInvNo", "batteryModel", "batteryCount", "salesCount", "closingStock"]}
+                filename="inventory_items.csv"
+                title="Sales Vehicles Inventory"
+              />
+            </div>
+
             <div className="bg-card rounded-lg border border-border p-6">
               <h2 className="text-xl font-semibold mb-4">
                 {editingId ? "Edit Inventory Row" : "Add Inventory Row"}

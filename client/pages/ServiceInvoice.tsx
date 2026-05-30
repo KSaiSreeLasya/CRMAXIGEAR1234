@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { getEmployeeSession } from "@/lib/auth";
 import ServiceInvoiceContent from "@/components/ServiceInvoiceContent";
+import { ImportExport } from "@/components/ImportExport";
 
 interface ProductRow {
   id?: string;
@@ -531,6 +532,109 @@ export default function ServiceInvoice() {
 
   const currentPreview = previewId ? invoices.find((inv) => inv.id === previewId) : null;
 
+  const handleImportServiceInvoices = async (importedItems: Record<string, any>[]) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      if (!userId && supabase) {
+        throw new Error("User not authenticated");
+      }
+
+      const newInvoices: ServiceInvoiceRecord[] = [];
+      const invoicesToInsert = importedItems.map((item) => {
+        const products = item.products ? (Array.isArray(item.products) ? item.products : [item.products]) : [];
+        const subtotal = products.reduce((sum: number, p: any) => sum + ((p.amount || 0) * (p.unit || 1)), 0);
+        const labour = item.labourCharges || 0;
+        const subtotalWithLabour = subtotal + labour;
+        const gstAmount = item.gstEnabled !== false ? subtotalWithLabour * 0.05 : 0;
+        const total = subtotalWithLabour + gstAmount;
+
+        return {
+          user_id: userId,
+          service_invoice_no: item.serviceInvoiceNo,
+          customer_name: item.customerName,
+          contact_no: item.contactNo,
+          location: item.location,
+          invoice_date: item.invoiceDate,
+          products: products,
+          labour_charges: labour,
+          gst_enabled: item.gstEnabled !== false,
+          gst_amount: gstAmount,
+          total: total,
+          mode_of_payment: item.modeOfPayment || "Cash",
+          lead_source: item.leadSource || null,
+        };
+      });
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("service_invoices")
+            .insert(invoicesToInsert)
+            .select();
+
+          if (error) throw error;
+
+          data?.forEach((row: any) => {
+            newInvoices.push({
+              id: row.id,
+              serviceInvoiceNo: row.service_invoice_no || "",
+              customerName: row.customer_name || "",
+              contactNo: row.contact_no || "",
+              location: row.location || "",
+              invoiceDate: row.invoice_date || "",
+              products: row.products || [],
+              labourCharges: row.labour_charges || 0,
+              gstEnabled: row.gst_enabled !== false,
+              gstAmount: row.gst_amount || 0,
+              total: row.total || 0,
+              modeOfPayment: row.mode_of_payment || "Cash",
+              leadSource: row.lead_source || "",
+              createdAt: new Date(row.created_at).toLocaleDateString(),
+            });
+          });
+        } catch (supabaseError: any) {
+          console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
+          importedItems.forEach((item) => {
+            const products = item.products ? (Array.isArray(item.products) ? item.products : [item.products]) : [];
+            const subtotal = products.reduce((sum: number, p: any) => sum + ((p.amount || 0) * (p.unit || 1)), 0);
+            const labour = item.labourCharges || 0;
+            const subtotalWithLabour = subtotal + labour;
+            const gstAmount = item.gstEnabled !== false ? subtotalWithLabour * 0.05 : 0;
+            const total = subtotalWithLabour + gstAmount;
+
+            const invoice: ServiceInvoiceRecord = {
+              id: `service_invoice_${Date.now()}_${Math.random()}`,
+              serviceInvoiceNo: item.serviceInvoiceNo,
+              customerName: item.customerName,
+              contactNo: item.contactNo,
+              location: item.location,
+              invoiceDate: item.invoiceDate,
+              products: products,
+              labourCharges: labour,
+              gstEnabled: item.gstEnabled !== false,
+              gstAmount: gstAmount,
+              total: total,
+              modeOfPayment: item.modeOfPayment || "Cash",
+              leadSource: item.leadSource || "",
+              createdAt: new Date().toLocaleDateString(),
+            };
+            newInvoices.push(invoice);
+          });
+        }
+      }
+
+      const updated = [...newInvoices, ...invoices];
+      setInvoices(updated);
+      localStorage.setItem("crm_service_invoices", JSON.stringify(updated));
+      alert(`Successfully imported ${newInvoices.length} service invoice(s)`);
+    } catch (error: any) {
+      console.error("Error importing service invoices:", error);
+      throw error;
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12 space-y-8">
@@ -542,6 +646,30 @@ export default function ServiceInvoice() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Service Invoices</h1>
           <p className="text-muted-foreground">Create and manage service invoices with PDF generation.</p>
+        </div>
+
+        {/* Import/Export Section */}
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-xl font-semibold mb-4">Import/Export Service Invoices</h2>
+          <ImportExport
+            data={invoices.map(inv => ({
+              serviceInvoiceNo: inv.serviceInvoiceNo,
+              customerName: inv.customerName,
+              contactNo: inv.contactNo,
+              location: inv.location,
+              invoiceDate: inv.invoiceDate,
+              labourCharges: inv.labourCharges,
+              gstEnabled: inv.gstEnabled,
+              modeOfPayment: inv.modeOfPayment,
+              leadSource: inv.leadSource,
+              total: inv.total,
+            }))}
+            onImport={handleImportServiceInvoices}
+            dataType="serviceInvoices"
+            exportHeaders={["serviceInvoiceNo", "customerName", "contactNo", "location", "invoiceDate", "labourCharges", "gstEnabled", "modeOfPayment", "leadSource", "total"]}
+            filename="service_invoices.csv"
+            title="Service Invoices"
+          />
         </div>
 
         {/* Form Section */}
