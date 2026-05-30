@@ -6,6 +6,7 @@ import { ArrowLeft, Trash2, Plus, Edit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { getEmployeeSession } from "@/lib/auth";
+import { ImportExport } from "@/components/ImportExport";
 
 interface EstimationRecord {
   id: string;
@@ -230,6 +231,75 @@ export default function Sales() {
     setEstimationForm(DEFAULT_ESTIMATION_FORM);
   };
 
+  const handleImportEstimations = async (importedItems: Record<string, any>[]) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      if (!userId && supabase) {
+        throw new Error("User not authenticated");
+      }
+
+      const newEstimations: EstimationRecord[] = [];
+      const estimationsToInsert = importedItems.map((item) => ({
+        user_id: userId,
+        estimation_slip_no: item.estimationSlipNo,
+        customer_name: item.customerName,
+        contact_no: item.contactNo,
+        estimation_date: item.estimationDate,
+        model: item.model,
+        amount: Number(item.amount || 0),
+      }));
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("estimations")
+            .insert(estimationsToInsert)
+            .select();
+
+          if (error) throw error;
+
+          data?.forEach((row: any) => {
+            newEstimations.push({
+              id: row.id,
+              estimationSlipNo: row.estimation_slip_no || "",
+              customerName: row.customer_name || "",
+              contactNo: row.contact_no || "",
+              estimationDate: row.estimation_date || "",
+              model: row.model || "",
+              amount: row.amount || 0,
+              createdAt: new Date(row.created_at).toLocaleDateString(),
+            });
+          });
+        } catch (supabaseError: any) {
+          console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
+          importedItems.forEach((item) => {
+            const estimation: EstimationRecord = {
+              id: `estimation_${Date.now()}_${Math.random()}`,
+              estimationSlipNo: item.estimationSlipNo,
+              customerName: item.customerName,
+              contactNo: item.contactNo,
+              estimationDate: item.estimationDate,
+              model: item.model,
+              amount: Number(item.amount || 0),
+              createdAt: new Date().toLocaleDateString(),
+            };
+            newEstimations.push(estimation);
+          });
+        }
+      }
+
+      const updated = [...newEstimations, ...estimations];
+      setEstimations(updated);
+      localStorage.setItem("crm_estimations", JSON.stringify(updated));
+      alert(`Successfully imported ${newEstimations.length} estimation(s)`);
+    } catch (error: any) {
+      console.error("Error importing estimations:", error);
+      throw error;
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12 space-y-8">
@@ -254,6 +324,18 @@ export default function Sales() {
 
           {/* Estimation Cost Tab */}
           <TabsContent value="estimation" className="space-y-6">
+            <div className="bg-card rounded-lg border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Import/Export Estimations</h2>
+              <ImportExport
+                data={estimations}
+                onImport={handleImportEstimations}
+                dataType="estimations"
+                exportHeaders={["estimationSlipNo", "customerName", "contactNo", "estimationDate", "model", "amount"]}
+                filename="sales_estimations.csv"
+                title="Sales Estimations"
+              />
+            </div>
+
             <div className="bg-card rounded-lg border border-border p-6">
               <h2 className="text-xl font-semibold mb-4">
                 {editingEstimationId ? "Edit Estimation" : "Add Estimation"}
