@@ -215,15 +215,43 @@ export async function getSplitPaymentsByReference(
       return [];
     }
 
-    if (!data || !data.split_payments) return [];
+    if (data && data.split_payments && data.split_payments.length > 0) {
+      return data.split_payments.map((sp: any) => ({
+        amount: sp.amount,
+        modeOfPayment: sp.mode_of_payment,
+        paymentDate: sp.payment_date,
+      }));
+    }
 
-    return data.split_payments.map((sp: any) => ({
-      amount: sp.amount,
-      modeOfPayment: sp.mode_of_payment,
-      paymentDate: sp.payment_date,
-    }));
+    return [];
   } catch (error) {
     console.error("Error fetching split payments:", error);
     return [];
+  }
+}
+
+export async function ensureSplitPaymentsMigrated(
+  referenceType: "estimation" | "service_invoice" | "project",
+  referenceId: string,
+  totalAmount: number,
+  splitPayments: SplitPayment[]
+): Promise<void> {
+  if (!supabase || splitPayments.length === 0) return;
+
+  try {
+    // Check if transaction already exists
+    const { data: existingTransaction } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("reference_type", referenceType)
+      .eq("reference_id", referenceId)
+      .single();
+
+    // If transaction doesn't exist, create it
+    if (!existingTransaction) {
+      await createTransaction(referenceType, referenceId, totalAmount, splitPayments);
+    }
+  } catch (error) {
+    console.error("Error in ensureSplitPaymentsMigrated:", error);
   }
 }

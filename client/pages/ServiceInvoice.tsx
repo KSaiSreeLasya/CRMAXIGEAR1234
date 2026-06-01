@@ -497,8 +497,14 @@ export default function ServiceInvoice() {
   const handleEdit = async (item: ServiceInvoiceRecord) => {
     setEditingId(item.id);
 
-    // Load split payments from Supabase
-    const splitPayments = await getSplitPaymentsByReference("service_invoice", item.id);
+    // Load split payments from Supabase first, fallback to localStorage
+    let splitPayments = await getSplitPaymentsByReference("service_invoice", item.id);
+
+    // If no payments in Supabase, initialize with empty array
+    // (Service invoices may not have split payments stored in the record itself)
+    if (splitPayments.length === 0) {
+      splitPayments = [];
+    }
 
     setForm({
       serviceInvoiceNo: item.serviceInvoiceNo,

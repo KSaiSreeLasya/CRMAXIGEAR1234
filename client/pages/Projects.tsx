@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { ImportExport } from "@/components/ImportExport";
 import { SplitPaymentForm, type SplitPayment } from "@/components/SplitPaymentForm";
 import { PaymentHistoryDisplay } from "@/components/PaymentHistoryDisplay";
-import { createTransaction, getTransactionByReference, getSplitPaymentsByReference, updateTransaction } from "@/lib/transactions";
+import { createTransaction, getTransactionByReference, getSplitPaymentsByReference, updateTransaction, ensureSplitPaymentsMigrated } from "@/lib/transactions";
 
 interface EstimationRecord {
   id: string;
@@ -339,7 +339,17 @@ export default function Projects() {
 
   const handleEditEstimation = async (item: EstimationRecord) => {
     setEditingEstimationId(item.id);
-    const splitPayments = await getSplitPaymentsByReference("estimation", item.id);
+
+    // Load split payments from Supabase first, fallback to localStorage
+    let splitPayments = await getSplitPaymentsByReference("estimation", item.id);
+
+    // If no payments in Supabase, check if item has splitPayments from localStorage
+    if (splitPayments.length === 0 && item.splitPayments && item.splitPayments.length > 0) {
+      splitPayments = item.splitPayments;
+      // Migrate to Supabase if they exist in localStorage but not in Supabase
+      await ensureSplitPaymentsMigrated("estimation", item.id, item.amount, splitPayments);
+    }
+
     setEstimationSplitPayments(splitPayments);
     setEstimationForm({
       estimationSlipNo: item.estimationSlipNo,
