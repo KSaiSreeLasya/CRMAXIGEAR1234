@@ -8,6 +8,8 @@ import CreateProjectModal from "@/components/CreateProjectModal";
 import EditProjectModal from "@/components/EditProjectModal";
 import { supabase } from "@/lib/supabase";
 import { ImportExport } from "@/components/ImportExport";
+import { SplitPaymentForm, type SplitPayment } from "@/components/SplitPaymentForm";
+import { createTransaction } from "@/lib/transactions";
 
 interface EstimationRecord {
   id: string;
@@ -20,6 +22,7 @@ interface EstimationRecord {
   amount: number;
   modeOfPayment: string;
   leadSource: string;
+  splitPayments?: SplitPayment[];
   createdAt: string;
 }
 
@@ -53,6 +56,7 @@ export interface Project {
   amount: number;
   modeOfPayment: string;
   leadSource: string;
+  splitPayments?: SplitPayment[];
   createdAt: string;
 }
 
@@ -65,6 +69,7 @@ export default function Projects() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [estimations, setEstimations] = useState<EstimationRecord[]>([]);
   const [estimationForm, setEstimationForm] = useState(DEFAULT_ESTIMATION_FORM);
+  const [estimationSplitPayments, setEstimationSplitPayments] = useState<SplitPayment[]>([]);
   const [editingEstimationId, setEditingEstimationId] = useState<string | null>(null);
   const [isLoadingEstimations, setIsLoadingEstimations] = useState(false);
   const [isSavingEstimation, setIsSavingEstimation] = useState(false);
@@ -256,6 +261,17 @@ export default function Projects() {
               ...payload,
               createdAt: new Date().toLocaleDateString(),
             };
+
+            // Create transaction with split payments
+            if (estimationSplitPayments.length > 0) {
+              await createTransaction(
+                "estimation",
+                data[0].id,
+                payload.amount,
+                estimationSplitPayments
+              );
+            }
+
             setEstimations((prev) => [created, ...prev]);
           } catch (supabaseError: any) {
             console.error("Error creating estimation in Supabase:", supabaseError?.message);
@@ -281,6 +297,7 @@ export default function Projects() {
       }
 
       setEstimationForm(DEFAULT_ESTIMATION_FORM);
+      setEstimationSplitPayments([]);
       setEditingEstimationId(null);
     } catch (error: any) {
       console.error("Error saving estimation:", error);
@@ -328,6 +345,7 @@ export default function Projects() {
   const cancelEditEstimation = () => {
     setEditingEstimationId(null);
     setEstimationForm(DEFAULT_ESTIMATION_FORM);
+    setEstimationSplitPayments([]);
   };
 
   const handleCreateProject = async (newProject: Omit<Project, "id" | "createdAt">) => {
@@ -964,6 +982,16 @@ export default function Projects() {
                     value={estimationForm.leadSource}
                     onChange={(e) => setEstimationForm((prev) => ({ ...prev, leadSource: e.target.value }))}
                   />
+
+                  <div className="md:col-span-2 border border-border rounded-lg p-4">
+                    <h3 className="font-semibold text-sm mb-4">Payment Breakdown (Split Payments)</h3>
+                    <SplitPaymentForm
+                      totalAmount={parseFloat(estimationForm.amount as string) || 0}
+                      initialPayments={estimationSplitPayments}
+                      onPaymentsChange={(payments) => setEstimationSplitPayments(payments)}
+                    />
+                  </div>
+
                   <button
                     type="submit"
                     disabled={isSavingEstimation}

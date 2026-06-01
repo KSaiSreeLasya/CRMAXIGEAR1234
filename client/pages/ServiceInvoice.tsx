@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { getEmployeeSession } from "@/lib/auth";
 import ServiceInvoiceContent from "@/components/ServiceInvoiceContent";
 import { ImportExport } from "@/components/ImportExport";
+import { SplitPaymentForm, type SplitPayment } from "@/components/SplitPaymentForm";
+import { createTransaction, getTransactionByReference } from "@/lib/transactions";
 
 interface ProductRow {
   id?: string;
@@ -61,6 +63,7 @@ interface InvoiceForm {
   modeOfPayment: string;
   leadSource: string;
   products: ProductRow[];
+  splitPayments: SplitPayment[];
 }
 
 const createDefaultForm = (): InvoiceForm => ({
@@ -74,6 +77,7 @@ const createDefaultForm = (): InvoiceForm => ({
   modeOfPayment: "Cash",
   leadSource: "",
   products: [{ ...DEFAULT_PRODUCT_ROW, id: `product_${Date.now()}` }],
+  splitPayments: [],
 });
 
 const DEFAULT_FORM = createDefaultForm();
@@ -388,6 +392,17 @@ export default function ServiceInvoice() {
               leadSource: data.lead_source || "",
               createdAt: new Date(data.created_at).toLocaleDateString(),
             };
+
+            // Create transaction with split payments
+            if (form.splitPayments.length > 0) {
+              await createTransaction(
+                "service_invoice",
+                data.id,
+                payload.total,
+                form.splitPayments
+              );
+            }
+
             setInvoices((prev) => [created, ...prev]);
           } catch (supabaseError: any) {
             console.warn("Supabase insert failed, using localStorage:", supabaseError?.message);
@@ -443,6 +458,10 @@ export default function ServiceInvoice() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  const resetSplitPayments = () => {
+    setForm((prev) => ({ ...prev, splitPayments: [] }));
   };
 
   const handleDelete = async (id: string) => {
@@ -484,6 +503,7 @@ export default function ServiceInvoice() {
         amount: p.amount,
         unit: p.unit,
       })),
+      splitPayments: [],
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -491,6 +511,7 @@ export default function ServiceInvoice() {
   const cancelEdit = () => {
     setEditingId(null);
     setForm(createDefaultForm());
+    resetSplitPayments();
   };
 
   const handleDownloadPDF = (invoice: ServiceInvoiceRecord) => {
@@ -921,6 +942,16 @@ export default function ServiceInvoice() {
                 <span className="font-semibold text-lg">Invoice Total:</span>
                 <span className="text-2xl font-bold text-primary">₹{(calculateTotal(form.products, form.labourCharges, form.gstEnabled) || 0).toFixed(2)}</span>
               </div>
+            </div>
+
+            {/* Split Payment Section */}
+            <div className="border border-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Payment Details (Split Payments)</h3>
+              <SplitPaymentForm
+                totalAmount={calculateTotal(form.products, form.labourCharges, form.gstEnabled) || 0}
+                initialPayments={form.splitPayments}
+                onPaymentsChange={(payments) => setForm((prev) => ({ ...prev, splitPayments: payments }))}
+              />
             </div>
 
             {/* Submit Buttons */}
