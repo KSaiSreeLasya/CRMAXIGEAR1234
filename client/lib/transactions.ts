@@ -25,15 +25,24 @@ export async function createTransaction(
   if (!supabase) return null;
 
   try {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user?.id) {
+      console.error("User not authenticated for transaction creation");
+      return null;
+    }
+
+    const paidAmount = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+
     // Create transaction
     const { data: transaction, error: txError } = await supabase
       .from("transactions")
       .insert({
+        user_id: userData.user.id,
         reference_type: referenceType,
         reference_id: referenceId,
         total_amount: totalAmount,
-        paid_amount: splitPayments.reduce((sum, p) => sum + p.amount, 0),
-        status: splitPayments.reduce((sum, p) => sum + p.amount, 0) >= totalAmount ? "complete" : "partial",
+        paid_amount: paidAmount,
+        status: paidAmount >= totalAmount ? "complete" : "partial",
       })
       .select()
       .single();

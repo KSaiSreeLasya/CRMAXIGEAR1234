@@ -430,12 +430,17 @@ export default function Projects() {
 
           // Create transaction with split payments
           if (splitPayments && splitPayments.length > 0) {
-            await createTransaction(
-              "project",
-              data[0].id,
-              newProject.amount,
-              splitPayments
-            );
+            try {
+              await createTransaction(
+                "project",
+                data[0].id,
+                newProject.amount,
+                splitPayments
+              );
+            } catch (txError) {
+              console.error("Error creating transaction for project:", txError);
+              // Continue even if transaction creation fails
+            }
           }
 
           setProjects([dbProject, ...projects]);
