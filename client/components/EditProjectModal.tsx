@@ -567,6 +567,11 @@ export default function EditProjectModal({
             {/* Split Payment Section */}
             <div className="border border-border rounded-lg p-6">
               <h3 className="font-semibold text-sm mb-4">Payment Breakdown (Split Payments)</h3>
+              {splitPayments.length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                  Loaded {splitPayments.length} payment(s) from database
+                </div>
+              )}
               <SplitPaymentForm
                 totalAmount={parseFloat(formData.amount as string) || 0}
                 initialPayments={splitPayments}

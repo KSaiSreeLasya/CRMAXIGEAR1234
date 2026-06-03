@@ -93,26 +93,39 @@ export default function Projects() {
 
           if (error) throw error;
 
-          const formattedProjects = data?.map((project: any) => ({
-            id: project.id,
-            modelNo: project.model_no || "",
-            customerName: project.customer_name,
-            contactNo: project.contact_no,
-            location: project.location,
-            productDescription: project.product_description,
-            hsnNo: project.hsn_no,
-            chassisNo: project.chassis_no,
-            motorNo: project.motor_no || "",
-            batteryNo: project.battery_no || "",
-            batteryWarranty: project.battery_warranty || "",
-            batteryCapacity: project.battery_capacity || "",
-            vehicleWarranty: project.vehicle_warranty || "",
-            invoiceDate: project.invoice_date || "",
-            amount: project.amount,
-            modeOfPayment: project.mode_of_payment || "Cash",
-            leadSource: project.lead_source || "",
-            createdAt: new Date(project.created_at).toLocaleDateString(),
-          })) || [];
+          const formattedProjects = await Promise.all(
+            data?.map(async (project: any) => {
+              let splitPayments: SplitPayment[] = [];
+              try {
+                const payments = await getSplitPaymentsByReference("project", project.id);
+                splitPayments = payments;
+              } catch (err) {
+                console.warn(`Could not load split payments for project ${project.id}:`, err);
+              }
+
+              return {
+                id: project.id,
+                modelNo: project.model_no || "",
+                customerName: project.customer_name,
+                contactNo: project.contact_no,
+                location: project.location,
+                productDescription: project.product_description,
+                hsnNo: project.hsn_no,
+                chassisNo: project.chassis_no,
+                motorNo: project.motor_no || "",
+                batteryNo: project.battery_no || "",
+                batteryWarranty: project.battery_warranty || "",
+                batteryCapacity: project.battery_capacity || "",
+                vehicleWarranty: project.vehicle_warranty || "",
+                invoiceDate: project.invoice_date || "",
+                amount: project.amount,
+                modeOfPayment: project.mode_of_payment || "Cash",
+                leadSource: project.lead_source || "",
+                splitPayments,
+                createdAt: new Date(project.created_at).toLocaleDateString(),
+              };
+            }) || []
+          );
 
           setProjects(formattedProjects);
           return;
@@ -513,6 +526,20 @@ export default function Projects() {
             .eq('id', id);
 
           if (error) throw error;
+
+          // Handle split payments update
+          if (updatedData.splitPayments && updatedData.splitPayments.length > 0) {
+            try {
+              const transaction = await getTransactionByReference("project", id);
+              if (transaction) {
+                await updateTransaction(transaction.id, updatedData.splitPayments);
+              } else {
+                await createTransaction("project", id, updatedData.amount, updatedData.splitPayments);
+              }
+            } catch (txError) {
+              console.error("Error updating transaction for project:", txError);
+            }
+          }
         } catch (supabaseError) {
           console.error("Error updating project in Supabase:", supabaseError);
           // Fall through to localStorage

@@ -31,7 +31,16 @@ export async function createTransaction(
       return null;
     }
 
-    const paidAmount = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+    // Filter out zero-amount payments before saving
+    const validPayments = splitPayments.filter((p) => p.amount > 0);
+    const paidAmount = validPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    console.log(`Creating transaction for ${referenceType}:${referenceId}`, {
+      totalAmount,
+      paidAmount,
+      paymentCount: validPayments.length,
+      validPayments,
+    });
 
     // Create transaction
     const { data: transaction, error: txError } = await supabase
@@ -52,21 +61,26 @@ export async function createTransaction(
       return null;
     }
 
-    // Create split payments
-    const paymentsToInsert = splitPayments.map((payment) => ({
-      transaction_id: transaction.id,
-      amount: payment.amount,
-      mode_of_payment: payment.modeOfPayment,
-      payment_date: payment.paymentDate,
-    }));
+    // Only insert payments if there are any valid payments
+    if (validPayments.length > 0) {
+      const paymentsToInsert = validPayments.map((payment) => ({
+        transaction_id: transaction.id,
+        amount: payment.amount,
+        mode_of_payment: payment.modeOfPayment,
+        payment_date: payment.paymentDate,
+      }));
 
-    const { error: paymentsError } = await supabase.from("split_payments").insert(paymentsToInsert);
+      console.log("Inserting split payments:", paymentsToInsert);
 
-    if (paymentsError) {
-      console.error("Failed to create split payments:", paymentsError);
-      return null;
+      const { error: paymentsError } = await supabase.from("split_payments").insert(paymentsToInsert);
+
+      if (paymentsError) {
+        console.error("Failed to create split payments:", paymentsError);
+        return null;
+      }
     }
 
+    console.log("✓ Successfully created transaction with split payments for", referenceType, referenceId);
     return transaction;
   } catch (error) {
     console.error("Error creating transaction:", error);
@@ -123,7 +137,15 @@ export async function updateTransaction(
   if (!supabase) return null;
 
   try {
-    const totalPaid = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+    // Filter out zero-amount payments
+    const validPayments = splitPayments.filter((p) => p.amount > 0);
+    const totalPaid = validPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    console.log(`Updating transaction ${transactionId}`, {
+      paymentCount: validPayments.length,
+      totalPaid,
+      validPayments,
+    });
 
     // Get current transaction to check total amount
     const { data: transaction } = await supabase
@@ -137,15 +159,24 @@ export async function updateTransaction(
     // Delete old split payments
     await supabase.from("split_payments").delete().eq("transaction_id", transactionId);
 
-    // Insert new split payments
-    const paymentsToInsert = splitPayments.map((payment) => ({
-      transaction_id: transactionId,
-      amount: payment.amount,
-      mode_of_payment: payment.modeOfPayment,
-      payment_date: payment.paymentDate,
-    }));
+    // Insert new split payments (only if there are valid payments)
+    if (validPayments.length > 0) {
+      const paymentsToInsert = validPayments.map((payment) => ({
+        transaction_id: transactionId,
+        amount: payment.amount,
+        mode_of_payment: payment.modeOfPayment,
+        payment_date: payment.paymentDate,
+      }));
 
-    await supabase.from("split_payments").insert(paymentsToInsert);
+      console.log("Inserting updated split payments:", paymentsToInsert);
+
+      const { error: insertError } = await supabase.from("split_payments").insert(paymentsToInsert);
+
+      if (insertError) {
+        console.error("Failed to insert updated split payments:", insertError);
+        return null;
+      }
+    }
 
     // Update transaction status
     const { data, error } = await supabase
@@ -163,6 +194,7 @@ export async function updateTransaction(
       return null;
     }
 
+    console.log("✓ Successfully updated transaction", transactionId);
     return data;
   } catch (error) {
     console.error("Error updating transaction:", error);
@@ -195,34 +227,48 @@ export async function getSplitPaymentsByReference(
   if (!supabase) return [];
 
   try {
-    const { data, error } = await supabase
+    // First, get the transaction ID
+    const { data: transaction, error: txError } = await supabase
       .from("transactions")
-      .select(
-        `
-        split_payments (
-          amount,
-          mode_of_payment,
-          payment_date
-        )
-      `
-      )
+      .select("id")
       .eq("reference_type", referenceType)
       .eq("reference_id", referenceId)
       .single();
 
-    if (error && error.code !== "PGRST116") {
-      console.error("Failed to get split payments:", error);
+    if (txError && txError.code !== "PGRST116") {
+      console.warn(`Transaction query error for ${referenceType}:${referenceId}:`, txError);
       return [];
     }
 
-    if (data && data.split_payments && data.split_payments.length > 0) {
-      return data.split_payments.map((sp: any) => ({
+    if (!transaction) {
+      console.debug(`No transaction found for ${referenceType}:${referenceId}`);
+      return [];
+    }
+
+    console.log(`Found transaction ${transaction.id} for ${referenceType}:${referenceId}`);
+
+    // Then fetch split payments for this transaction
+    const { data: payments, error: paymentsError } = await supabase
+      .from("split_payments")
+      .select("amount, mode_of_payment, payment_date")
+      .eq("transaction_id", transaction.id)
+      .order("payment_date", { ascending: true });
+
+    if (paymentsError) {
+      console.error("Failed to get split payments:", paymentsError);
+      return [];
+    }
+
+    if (payments && payments.length > 0) {
+      console.log(`Loaded ${payments.length} split payments for transaction ${transaction.id}:`, payments);
+      return payments.map((sp: any) => ({
         amount: sp.amount,
         modeOfPayment: sp.mode_of_payment,
         paymentDate: sp.payment_date,
       }));
     }
 
+    console.debug(`No split payments found for transaction ${transaction.id}`);
     return [];
   } catch (error) {
     console.error("Error fetching split payments:", error);
