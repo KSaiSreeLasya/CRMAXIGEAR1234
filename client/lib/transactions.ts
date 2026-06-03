@@ -31,7 +31,16 @@ export async function createTransaction(
       return null;
     }
 
-    const paidAmount = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+    // Filter out zero-amount payments before saving
+    const validPayments = splitPayments.filter((p) => p.amount > 0);
+    const paidAmount = validPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    console.log(`Creating transaction for ${referenceType}:${referenceId}`, {
+      totalAmount,
+      paidAmount,
+      paymentCount: validPayments.length,
+      validPayments,
+    });
 
     // Create transaction
     const { data: transaction, error: txError } = await supabase
@@ -52,24 +61,26 @@ export async function createTransaction(
       return null;
     }
 
-    // Create split payments
-    const paymentsToInsert = splitPayments.map((payment) => ({
-      transaction_id: transaction.id,
-      amount: payment.amount,
-      mode_of_payment: payment.modeOfPayment,
-      payment_date: payment.paymentDate,
-    }));
+    // Only insert payments if there are any valid payments
+    if (validPayments.length > 0) {
+      const paymentsToInsert = validPayments.map((payment) => ({
+        transaction_id: transaction.id,
+        amount: payment.amount,
+        mode_of_payment: payment.modeOfPayment,
+        payment_date: payment.paymentDate,
+      }));
 
-    console.log("Inserting split payments:", paymentsToInsert);
+      console.log("Inserting split payments:", paymentsToInsert);
 
-    const { error: paymentsError } = await supabase.from("split_payments").insert(paymentsToInsert);
+      const { error: paymentsError } = await supabase.from("split_payments").insert(paymentsToInsert);
 
-    if (paymentsError) {
-      console.error("Failed to create split payments:", paymentsError);
-      return null;
+      if (paymentsError) {
+        console.error("Failed to create split payments:", paymentsError);
+        return null;
+      }
     }
 
-    console.log("Successfully created transaction with split payments for", referenceType, referenceId);
+    console.log("✓ Successfully created transaction with split payments for", referenceType, referenceId);
     return transaction;
   } catch (error) {
     console.error("Error creating transaction:", error);
@@ -126,7 +137,15 @@ export async function updateTransaction(
   if (!supabase) return null;
 
   try {
-    const totalPaid = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+    // Filter out zero-amount payments
+    const validPayments = splitPayments.filter((p) => p.amount > 0);
+    const totalPaid = validPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    console.log(`Updating transaction ${transactionId}`, {
+      paymentCount: validPayments.length,
+      totalPaid,
+      validPayments,
+    });
 
     // Get current transaction to check total amount
     const { data: transaction } = await supabase
@@ -140,15 +159,24 @@ export async function updateTransaction(
     // Delete old split payments
     await supabase.from("split_payments").delete().eq("transaction_id", transactionId);
 
-    // Insert new split payments
-    const paymentsToInsert = splitPayments.map((payment) => ({
-      transaction_id: transactionId,
-      amount: payment.amount,
-      mode_of_payment: payment.modeOfPayment,
-      payment_date: payment.paymentDate,
-    }));
+    // Insert new split payments (only if there are valid payments)
+    if (validPayments.length > 0) {
+      const paymentsToInsert = validPayments.map((payment) => ({
+        transaction_id: transactionId,
+        amount: payment.amount,
+        mode_of_payment: payment.modeOfPayment,
+        payment_date: payment.paymentDate,
+      }));
 
-    await supabase.from("split_payments").insert(paymentsToInsert);
+      console.log("Inserting updated split payments:", paymentsToInsert);
+
+      const { error: insertError } = await supabase.from("split_payments").insert(paymentsToInsert);
+
+      if (insertError) {
+        console.error("Failed to insert updated split payments:", insertError);
+        return null;
+      }
+    }
 
     // Update transaction status
     const { data, error } = await supabase
@@ -166,6 +194,7 @@ export async function updateTransaction(
       return null;
     }
 
+    console.log("✓ Successfully updated transaction", transactionId);
     return data;
   } catch (error) {
     console.error("Error updating transaction:", error);
