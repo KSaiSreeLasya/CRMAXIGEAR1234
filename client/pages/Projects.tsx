@@ -1,7 +1,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, Trash2, Edit, FileText, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Edit, FileText, ArrowLeft, Download } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CreateProjectModal from "@/components/CreateProjectModal";
@@ -1126,6 +1126,13 @@ export default function Projects() {
                             <td className="px-4 py-2 text-sm">{est.leadSource || "-"}</td>
                             <td className="px-4 py-2">
                               <div className="flex items-center gap-3">
+                                <Link
+                                  to={`/estimation-slip/${est.id}`}
+                                  className="inline-flex items-center gap-1 text-primary hover:text-primary/90"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Download
+                                </Link>
                                 <button
                                   type="button"
                                   onClick={() => handleEditEstimation(est)}
