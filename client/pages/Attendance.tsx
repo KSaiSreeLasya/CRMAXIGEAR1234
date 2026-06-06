@@ -424,11 +424,13 @@ export default function Attendance() {
   const loadAttendance = async (): Promise<AttendanceEntry[]> => {
     setIsLoading(true);
     try {
+      console.log("📊 Fetching attendance for month:", viewYearMonth);
       const rows = await fetchAttendanceForMonth(viewYearMonth);
+      console.log(`✅ Loaded ${rows.length} attendance records for ${viewYearMonth}`);
       setRecords(rows);
       return rows;
     } catch (error) {
-      console.error("Error loading attendance:", error);
+      console.error("❌ Error loading attendance:", error);
       return [];
     } finally {
       setIsLoading(false);
@@ -921,7 +923,7 @@ export default function Attendance() {
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-auto">
                   <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Month</Label>
-                  <div className="relative flex items-center gap-2 rounded-xl border border-border/80 bg-background px-3 py-2 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
+                  <div className="relative flex items-center gap-2 rounded-xl border border-border/80 bg-background px-3 py-2 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
                     <CalendarRange className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-foreground">{formatMonthDisplay(viewYearMonth)}</p>
@@ -930,9 +932,12 @@ export default function Attendance() {
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
                     <input
                       type="month"
-                      className="absolute inset-0 cursor-pointer opacity-0"
+                      className="absolute inset-0 cursor-pointer opacity-0 z-50"
                       value={viewYearMonth}
-                      onChange={(e) => setViewYearMonth(e.target.value)}
+                      onChange={(e) => {
+                        console.log("Month input changed:", e.target.value);
+                        setViewYearMonth(e.target.value);
+                      }}
                       aria-label="Select month"
                     />
                   </div>
