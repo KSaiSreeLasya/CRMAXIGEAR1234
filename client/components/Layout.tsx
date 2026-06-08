@@ -96,6 +96,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               Inventory
             </Link>
+            <Link
+              to="/dealers"
+              className="text-sm font-medium transition-colors hover:text-primary"
+            >
+              Dealers
+            </Link>
             {isAdmin && (
               <>
                 <Link
@@ -162,6 +168,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Inventory
+              </Link>
+              <Link
+                to="/dealers"
+                className="text-sm font-medium transition-colors hover:text-primary"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Dealers
               </Link>
               {isAdmin && (
                 <>
