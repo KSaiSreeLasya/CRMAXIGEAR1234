@@ -139,6 +139,7 @@ export default function Projects() {
             amount: project.amount,
             modeOfPayment: project.mode_of_payment || "Cash",
             leadSource: project.lead_source || "",
+            gstNo: project.gst_no || "",
             createdAt: new Date(project.created_at).toLocaleDateString(),
           })) || [];
 
@@ -456,6 +457,7 @@ export default function Projects() {
                 amount: newProject.amount,
                 mode_of_payment: newProject.modeOfPayment,
                 lead_source: newProject.leadSource || null,
+                gst_no: newProject.gstNo || null,
                 show_split_payment_details: newProject.showSplitPaymentDetails ?? false,
               }
             ])
@@ -484,6 +486,7 @@ export default function Projects() {
             amount: data[0].amount,
             modeOfPayment: data[0].mode_of_payment || "Cash",
             leadSource: data[0].lead_source || "",
+            gstNo: data[0].gst_no || "",
             splitPayments: splitPayments,
             showSplitPaymentDetails: data[0].show_split_payment_details ?? false,
             createdAt: new Date(data[0].created_at).toLocaleDateString(),
@@ -554,15 +557,16 @@ export default function Projects() {
               product_description: updatedData.productDescription,
               hsn_no: updatedData.hsnNo,
               chassis_no: updatedData.chassisNo,
-              motor_no: updatedData.motorNo,
-              battery_no: updatedData.batteryNo,
+              motor_no: updatedData.motorNo || null,
+              battery_no: updatedData.batteryNo || null,
               battery_warranty: updatedData.batteryWarranty || null,
               battery_capacity: updatedData.batteryCapacity || null,
               vehicle_warranty: updatedData.vehicleWarranty || null,
-              invoice_date: updatedData.invoiceDate,
+              invoice_date: updatedData.invoiceDate || null,
               amount: updatedData.amount,
               mode_of_payment: updatedData.modeOfPayment,
               lead_source: updatedData.leadSource || null,
+              gst_no: updatedData.gstNo || null,
               show_split_payment_details: updatedData.showSplitPaymentDetails ?? false,
             })
             .eq('id', id);
