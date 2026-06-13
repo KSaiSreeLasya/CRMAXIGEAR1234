@@ -101,6 +101,7 @@ export default function Invoice() {
               amount: data.amount,
               modeOfPayment: data.mode_of_payment || "Cash",
               leadSource: data.lead_source || "",
+              gstNo: data.gst_no || "",
               createdAt: new Date(data.created_at).toLocaleDateString(),
             };
             setProject(project);
@@ -118,12 +119,11 @@ export default function Invoice() {
                   )
                 `)
                 .eq('reference_type', 'project')
-                .eq('reference_id', projectId)
-                .single();
+                .eq('reference_id', projectId);
 
-              if (txData?.split_payments) {
+              if (txData && txData.length > 0 && txData[0]?.split_payments) {
                 setSplitPayments(
-                  txData.split_payments.map((sp: any) => ({
+                  txData[0].split_payments.map((sp: any) => ({
                     amount: sp.amount ? (typeof sp.amount === 'string' ? parseFloat(sp.amount) : Number(sp.amount)) : 0,
                     modeOfPayment: sp.mode_of_payment,
                     paymentDate: sp.payment_date,
