@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 export const handleCreateAdminEmployee: RequestHandler = async (req, res) => {
   try {
@@ -23,7 +24,11 @@ export const handleCreateAdminEmployee: RequestHandler = async (req, res) => {
       return;
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      realtime: {
+        transport: ws as any,
+      },
+    });
 
     // Try RPC first (if service role key is available)
     const { data, error } = await supabase.rpc("create_employee", {
@@ -34,9 +39,10 @@ export const handleCreateAdminEmployee: RequestHandler = async (req, res) => {
       p_role: role.trim(),
     });
 
-    if (error && error.message.includes("not authenticated")) {
-      // If RPC fails due to auth, try direct insert with hashed password
-      // Use simple hash for basic password storage
+    if (error) {
+      // If RPC fails, try direct insert with hashed password
+      console.error("RPC failed, attempting direct insert:", error.message);
+
       const hashedPassword = Buffer.from(password).toString("base64");
 
       const { data: insertData, error: insertError } = await supabase
@@ -53,7 +59,8 @@ export const handleCreateAdminEmployee: RequestHandler = async (req, res) => {
       if (insertError) {
         console.error("Error inserting employee:", insertError);
         res.status(500).json({
-          error: insertError.message || "Failed to create employee",
+          error: `Failed to create employee: ${insertError.message}`,
+          code: insertError.code,
         });
         return;
       }
@@ -76,12 +83,6 @@ export const handleCreateAdminEmployee: RequestHandler = async (req, res) => {
           createdAt: employee.created_at,
         },
       });
-    } else if (error) {
-      console.error("Error creating admin employee:", error);
-      res.status(500).json({
-        error: error.message || "Failed to create admin employee",
-      });
-      return;
     } else {
       const employee = data?.[0];
       if (!employee) {
