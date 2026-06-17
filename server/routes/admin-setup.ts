@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 export const handleCreateAdminEmployee: RequestHandler = async (req, res) => {
   try {
@@ -23,7 +24,11 @@ export const handleCreateAdminEmployee: RequestHandler = async (req, res) => {
       return;
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      realtime: {
+        transport: ws as any,
+      },
+    });
 
     // Try RPC first (if service role key is available)
     const { data, error } = await supabase.rpc("create_employee", {
