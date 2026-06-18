@@ -285,29 +285,10 @@ export default function DealerInvoiceContent({
           <span className="font-semibold text-gray-900">₹{taxableAmount.toFixed(2)}</span>
         </div>
         {gstEnabled && (
-          <>
-            {gstType === "igst" ? (
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-gray-700">IGST:</span>
-                <span className="font-semibold text-gray-900">₹{igstAmount.toFixed(2)}</span>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">CGST:</span>
-                  <span className="font-semibold text-gray-900">₹{cgstAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">SGST:</span>
-                  <span className="font-semibold text-gray-900">₹{sgstAmount.toFixed(2)}</span>
-                </div>
-              </>
-            )}
-            <div className="border-t border-gray-300 pt-2 flex justify-between font-bold text-base">
-              <span className="text-gray-900">TOTAL AMOUNT:</span>
-              <span className="text-green-700">₹{totalAmount.toFixed(2)}</span>
-            </div>
-          </>
+          <div className="border-t border-gray-300 pt-2 flex justify-between font-bold text-base">
+            <span className="text-gray-900">TOTAL AMOUNT:</span>
+            <span className="text-green-700">₹{totalAmount.toFixed(2)}</span>
+          </div>
         )}
       </div>
     </div>
