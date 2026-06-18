@@ -11,6 +11,7 @@ import Accounts from "./pages/Accounts";
 import Sales from "./pages/Sales";
 import ServiceInvoice from "./pages/ServiceInvoice";
 import DealerInvoice from "./pages/DealerInvoice";
+import DealersProductInvoice from "./pages/DealersProductInvoice";
 import EstimationSlip from "./pages/EstimationSlip";
 import Invoice from "./pages/Invoice";
 import Attendance from "./pages/Attendance";
@@ -45,6 +46,7 @@ function AppRoutesContent() {
       <Route path="/sales" element={<ProtectedRoute element={<Sales />} />} />
       <Route path="/service-invoice" element={<ProtectedRoute element={<ServiceInvoice />} />} />
       <Route path="/dealer-invoice" element={<ProtectedRoute element={<DealerInvoice />} />} />
+      <Route path="/dealers-product-invoice" element={<ProtectedRoute element={<DealersProductInvoice />} />} />
       <Route path="/attendance" element={<ProtectedRoute element={<Attendance />} />} />
       <Route path="/inventory" element={<ProtectedRoute element={<Inventory />} />} />
       <Route path="/dealers" element={<ProtectedRoute element={<Dealers />} />} />
