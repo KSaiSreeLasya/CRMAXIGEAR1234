@@ -73,10 +73,22 @@ export default function DealerInvoiceContent({
 
   // Calculate GST per product based on their individual rates
   let totalProductGst = 0;
+  const gstRateBreakdown: { rate: number; amount: number }[] = [];
+
   products.forEach((p) => {
     const productLineTotal = p.amount * p.unit;
-    const gstRate = (p.gstRate || 18) / 100;
-    totalProductGst += roundCurrency(productLineTotal * gstRate);
+    const rate = p.gstRate || 18;
+    const gstRate = rate / 100;
+    const productGst = roundCurrency(productLineTotal * gstRate);
+    totalProductGst += productGst;
+
+    // Add to breakdown
+    const existingBreakdown = gstRateBreakdown.find(b => b.rate === rate);
+    if (existingBreakdown) {
+      existingBreakdown.amount += productGst;
+    } else {
+      gstRateBreakdown.push({ rate, amount: productGst });
+    }
   });
 
   // Add labour GST (18% default)
@@ -84,7 +96,14 @@ export default function DealerInvoiceContent({
   const gstAmount = gstEnabled ? totalProductGst + labourGst : 0;
   const totalAmount = gstEnabled ? roundCurrency(subtotalWithLabour + gstAmount) : subtotalWithLabour;
   const igstAmount = gstEnabled && gstType === "igst" ? gstAmount : 0;
-  const cgstAmount = gstEnabled && gstType === "cgst-sgst" ? roundCurrency(gstAmount / 2) : 0;
+
+  // Calculate CGST/SGST based on actual GST rates (half of each rate for CGST/SGST)
+  const cgstAmount = gstEnabled && gstType === "cgst-sgst"
+    ? roundCurrency(
+        gstRateBreakdown.reduce((sum, b) => sum + (b.amount / 2), 0) +
+        (labourCharges > 0 ? (labourGst / 2) : 0)
+      )
+    : 0;
   const sgstAmount = gstEnabled && gstType === "cgst-sgst" ? roundCurrency(gstAmount - cgstAmount) : 0;
 
   const containerClass = forPrint
@@ -234,7 +253,10 @@ export default function DealerInvoiceContent({
                 {product.gstRate || 18}%
               </td>
               <td className="px-3 py-2 text-right text-gray-900 font-medium">
-                {roundCurrency(product.amount * product.unit).toFixed(2)}
+                {roundCurrency(
+                  product.amount * product.unit +
+                  (product.amount * product.unit * ((product.gstRate || 18) / 100))
+                ).toFixed(2)}
               </td>
             </tr>
           ))}
@@ -258,34 +280,11 @@ export default function DealerInvoiceContent({
             <span className="font-semibold text-gray-900">₹{labourCharges.toFixed(2)}</span>
           </div>
         )}
-        <div className="border-t border-gray-300 pt-2 flex justify-between text-sm">
-          <span className="font-medium text-gray-700">Taxable Value:</span>
-          <span className="font-semibold text-gray-900">₹{taxableAmount.toFixed(2)}</span>
-        </div>
         {gstEnabled && (
-          <>
-            {gstType === "igst" ? (
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-gray-700">IGST (18%):</span>
-                <span className="font-semibold text-gray-900">₹{igstAmount.toFixed(2)}</span>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">CGST (9%):</span>
-                  <span className="font-semibold text-gray-900">₹{cgstAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">SGST (9%):</span>
-                  <span className="font-semibold text-gray-900">₹{sgstAmount.toFixed(2)}</span>
-                </div>
-              </>
-            )}
-            <div className="border-t border-gray-300 pt-2 flex justify-between font-bold text-base">
-              <span className="text-gray-900">TOTAL AMOUNT:</span>
-              <span className="text-green-700">₹{totalAmount.toFixed(2)}</span>
-            </div>
-          </>
+          <div className="border-t border-gray-300 pt-2 flex justify-between font-bold text-base">
+            <span className="text-gray-900">TOTAL AMOUNT:</span>
+            <span className="text-green-700">₹{totalAmount.toFixed(2)}</span>
+          </div>
         )}
       </div>
     </div>

@@ -202,17 +202,23 @@ export default function DealerInvoice() {
 
     // Calculate GST per product
     let totalGst = 0;
+    const gstBreakdown: { rate: number; amount: number }[] = [];
+
     products.forEach((product) => {
       const productLineTotal = product.amount * product.unit;
-      const gstRate = (product.gstRate || 18) / 100;
-      totalGst += Math.round(productLineTotal * gstRate);
+      const rate = product.gstRate || 18;
+      const gstRate = rate / 100;
+      const gstAmount = Math.round(productLineTotal * gstRate);
+      totalGst += gstAmount;
+      gstBreakdown.push({ rate, amount: gstAmount });
     });
 
     // Add labour GST if applicable
     const labourGstRate = 0.18; // Default to 18% for labour
-    totalGst += Math.round(labour * labourGstRate);
+    const labourGst = labour > 0 ? Math.round(labour * labourGstRate) : 0;
+    totalGst += labourGst;
 
-    return { productTotal, taxableTotal, gstAmount: totalGst, total: taxableTotal + totalGst };
+    return { productTotal, taxableTotal, gstAmount: totalGst, total: taxableTotal + totalGst, gstBreakdown, labourGst };
   };
 
   const saveInvoice = async (finalSplitPayments: SplitPayment[] = []) => {
@@ -223,13 +229,89 @@ export default function DealerInvoice() {
 
     setIsSaving(true);
     try {
-      const { productTotal: _productTotal, taxableTotal: _taxableTotal, gstAmount, total } = calculateInvoiceTotal(
+      const { productTotal, taxableTotal: _taxableTotal, gstAmount, total } = calculateInvoiceTotal(
         form.products,
         form.labourCharges
       );
 
+      const invoiceId = editingId || `dealer_inv_${Date.now()}`;
+      const createdAtTime = editingId ? invoices.find(i => i.id === editingId)?.createdAt || new Date().toISOString() : new Date().toISOString();
+
+      const invoiceRecord = {
+        id: invoiceId,
+        invoice_number: form.dealerInvoiceNo,
+        invoice_date: form.invoiceDate,
+        due_date: form.dueDate || null,
+        dealer_id: null,
+        dealer_name: form.dealerName,
+        contact_no: form.contactNo,
+        location: form.location,
+        purchase_order_no: form.poNumber || null,
+        sent_to: form.sentTo || null,
+        ship_to: form.shipTo || null,
+        mode_of_payment: form.modeOfPayment,
+        lead_source: form.leadSource || null,
+        labour_charges: form.labourCharges || 0,
+        subtotal: productTotal,
+        gst_enabled: form.gstEnabled,
+        total_gst_amount: gstAmount,
+        total_amount: total,
+        payment_status: "pending",
+        created_at: createdAtTime,
+        updated_at: new Date().toISOString(),
+        is_deleted: false,
+      };
+
+      if (supabase && !isLoading) {
+        try {
+          if (editingId) {
+            await supabase
+              .from("dealer_invoices")
+              .update(invoiceRecord)
+              .eq("id", invoiceId);
+
+            // Delete old items
+            await supabase
+              .from("dealers_invoice_items")
+              .delete()
+              .eq("invoice_id", invoiceId);
+          } else {
+            await supabase
+              .from("dealer_invoices")
+              .insert([invoiceRecord]);
+          }
+
+          // Insert invoice items
+          const itemsToInsert = form.products.map((product) => ({
+            id: `${invoiceId}_${product.id}`,
+            invoice_id: invoiceId,
+            product_name: product.product,
+            product_description: product.productDescription,
+            quantity: product.unit,
+            unit_price: product.amount,
+            line_total: product.amount * product.unit,
+            gst_rate: product.gstRate || 18,
+            gst_amount: Math.round((product.amount * product.unit * (product.gstRate || 18)) / 100),
+            line_amount_with_gst: product.amount * product.unit + Math.round((product.amount * product.unit * (product.gstRate || 18)) / 100),
+            created_at: createdAtTime,
+            updated_at: new Date().toISOString(),
+          }));
+
+          if (itemsToInsert.length > 0) {
+            await supabase
+              .from("dealers_invoice_items")
+              .insert(itemsToInsert);
+          }
+
+          alert("Invoice saved to Supabase successfully!");
+        } catch (error) {
+          console.warn("Supabase save failed, using localStorage:", error);
+        }
+      }
+
+      // Always update localStorage
       const record: DealerInvoiceRecord = {
-        id: editingId || `dealer_inv_${Date.now()}`,
+        id: invoiceId,
         dealerInvoiceNo: form.dealerInvoiceNo,
         dealerName: form.dealerName,
         contactNo: form.contactNo,
@@ -246,27 +328,9 @@ export default function DealerInvoice() {
         gstAmount,
         modeOfPayment: form.modeOfPayment,
         leadSource: form.leadSource,
-        createdAt: editingId ? invoices.find(i => i.id === editingId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
+        createdAt: createdAtTime,
       };
 
-      if (supabase && !isLoading) {
-        try {
-          if (editingId) {
-            await supabase
-              .from("dealer_invoices")
-              .update(record)
-              .eq("id", editingId);
-          } else {
-            await supabase
-              .from("dealer_invoices")
-              .insert([record]);
-          }
-        } catch (error) {
-          console.warn("Supabase save failed, using localStorage");
-        }
-      }
-
-      // Always update localStorage
       const current = localStorage.getItem("crm_dealer_invoices");
       const invoicesList: DealerInvoiceRecord[] = current ? JSON.parse(current) : [];
 
@@ -342,14 +406,25 @@ export default function DealerInvoice() {
 
     try {
       const element = document.getElementById(`invoice-preview-${id}`);
-      if (!element) return;
+      if (!element) {
+        alert("Invoice preview not found. Please try again.");
+        return;
+      }
 
       const html2pdf = (await import("html2pdf.js")).default;
-      const pdf = html2pdf();
-      pdf.from(element).save(`${invoice.dealerInvoiceNo}.pdf`);
+      const options = {
+        margin: 10,
+        filename: `${invoice.dealerInvoiceNo}.pdf`,
+        image: { type: "png", quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+      };
+
+      html2pdf().set(options).from(element).save();
+      alert("PDF downloaded successfully!");
     } catch (error) {
       console.error("Error downloading PDF:", error);
-      alert("Unable to download PDF");
+      alert("Unable to download PDF. Please check browser console.");
     }
   };
 
@@ -592,6 +667,15 @@ export default function DealerInvoice() {
             {/* Products Section */}
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-4">Products</h3>
+              <div className="mb-2 flex gap-2 items-center text-xs font-semibold text-gray-600 px-2">
+                <div className="flex-1">Product</div>
+                <div className="flex-1">Description</div>
+                <div className="w-20 text-right">Unit</div>
+                <div className="w-24 text-right">Amount</div>
+                <div className="w-20 text-center">GST Rate</div>
+                <div className="w-20 text-right">Total</div>
+                <div className="w-20 text-right">GST Amt</div>
+              </div>
               <div className="space-y-3">
                 {form.products.map((product, idx) => (
                   <div key={product.id} className="flex gap-2 items-end">
@@ -652,8 +736,11 @@ export default function DealerInvoice() {
                       <option value="5">GST 5%</option>
                       <option value="18">GST 18%</option>
                     </select>
-                    <span className="w-24 px-3 py-2 text-sm font-medium">
-                      ₹{(product.amount * product.unit).toFixed(2)}
+                    <span className="w-20 px-3 py-2 text-sm font-medium text-right">
+                      ₹{((product.amount * product.unit) + ((product.amount * product.unit * (product.gstRate || 18)) / 100)).toFixed(2)}
+                    </span>
+                    <span className="w-20 px-3 py-2 text-sm font-medium text-right text-blue-600">
+                      ₹{((product.amount * product.unit * (product.gstRate || 18)) / 100).toFixed(2)}
                     </span>
                     {form.products.length > 1 && (
                       <Button
@@ -694,7 +781,7 @@ export default function DealerInvoice() {
             {form.products.length > 0 && (
               <div className="bg-muted p-4 rounded-md mb-6">
                 {(() => {
-                  const { productTotal, taxableTotal, gstAmount, total } =
+                  const { productTotal, taxableTotal, gstAmount, total, gstBreakdown, labourGst } =
                     calculateInvoiceTotal(form.products, form.labourCharges);
                   return (
                     <div className="space-y-2 text-sm">
@@ -714,9 +801,19 @@ export default function DealerInvoice() {
                       </div>
                       {form.gstEnabled && (
                         <>
-                          <div className="flex justify-between">
-                            <span>GST (18%):</span>
-                            <span>₹{gstAmount.toFixed(2)}</span>
+                          <div className="space-y-1 pl-4">
+                            {gstBreakdown?.map((breakdown, idx) => (
+                              <div key={idx} className="flex justify-between text-xs">
+                                <span>GST ({breakdown.rate}%):</span>
+                                <span>₹{breakdown.amount.toFixed(2)}</span>
+                              </div>
+                            ))}
+                            {labourGst > 0 && (
+                              <div className="flex justify-between text-xs">
+                                <span>Labour GST (18%):</span>
+                                <span>₹{labourGst.toFixed(2)}</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex justify-between font-semibold border-t pt-2">
                             <span>Total:</span>
@@ -829,13 +926,6 @@ export default function DealerInvoice() {
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button
-                            onClick={() => downloadPDF(invoice.id)}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                          <Button
                             onClick={() => deleteInvoice(invoice.id)}
                             variant="outline"
                             size="sm"
@@ -856,15 +946,26 @@ export default function DealerInvoice() {
           {previewId && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto w-full">
-                <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+                <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center gap-4">
                   <h2 className="text-xl font-semibold">Invoice Preview</h2>
-                  <Button
-                    onClick={() => setPreviewId(null)}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => downloadPDF(previewId)}
+                      variant="outline"
+                      size="sm"
+                      className="flex gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download PDF
+                    </Button>
+                    <Button
+                      onClick={() => setPreviewId(null)}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="p-6">
                   {invoices.find((i) => i.id === previewId) && (
