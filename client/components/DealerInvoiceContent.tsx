@@ -287,48 +287,18 @@ export default function DealerInvoiceContent({
         {gstEnabled && (
           <>
             {gstType === "igst" ? (
-              <div className="space-y-1">
-                {gstRateBreakdown.map((breakdown) => (
-                  <div key={breakdown.rate} className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700">IGST ({breakdown.rate}%):</span>
-                    <span className="font-semibold text-gray-900">₹{breakdown.amount.toFixed(2)}</span>
-                  </div>
-                ))}
+              <div className="flex justify-between text-sm">
+                <span className="font-medium text-gray-700">IGST:</span>
+                <span className="font-semibold text-gray-900">₹{igstAmount.toFixed(2)}</span>
               </div>
             ) : (
               <>
-                <div className="space-y-1">
-                  {gstRateBreakdown.map((breakdown) => (
-                    <div key={breakdown.rate}>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>CGST ({(breakdown.rate / 2).toFixed(1)}%):</span>
-                        <span>₹{(breakdown.amount / 2).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>SGST ({(breakdown.rate / 2).toFixed(1)}%):</span>
-                        <span>₹{(breakdown.amount / 2).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {labourCharges > 0 && labourGst > 0 && (
-                    <>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>CGST (9%) [Labour]:</span>
-                        <span>₹{(labourGst / 2).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>SGST (9%) [Labour]:</span>
-                        <span>₹{(labourGst / 2).toFixed(2)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="border-t border-gray-300 pt-2 flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">Total CGST:</span>
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-gray-700">CGST:</span>
                   <span className="font-semibold text-gray-900">₹{cgstAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">Total SGST:</span>
+                  <span className="font-medium text-gray-700">SGST:</span>
                   <span className="font-semibold text-gray-900">₹{sgstAmount.toFixed(2)}</span>
                 </div>
               </>
