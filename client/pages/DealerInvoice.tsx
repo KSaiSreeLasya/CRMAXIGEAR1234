@@ -668,7 +668,7 @@ export default function DealerInvoice() {
                       <option value="18">GST 18%</option>
                     </select>
                     <span className="w-20 px-3 py-2 text-sm font-medium text-right">
-                      ₹{(product.amount * product.unit).toFixed(2)}
+                      ₹{((product.amount * product.unit) + ((product.amount * product.unit * (product.gstRate || 18)) / 100)).toFixed(2)}
                     </span>
                     <span className="w-20 px-3 py-2 text-sm font-medium text-right text-blue-600">
                       ₹{((product.amount * product.unit * (product.gstRate || 18)) / 100).toFixed(2)}
