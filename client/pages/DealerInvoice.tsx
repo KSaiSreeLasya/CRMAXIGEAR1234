@@ -926,13 +926,6 @@ export default function DealerInvoice() {
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button
-                            onClick={() => downloadPDF(invoice.id)}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                          <Button
                             onClick={() => deleteInvoice(invoice.id)}
                             variant="outline"
                             size="sm"
@@ -953,15 +946,26 @@ export default function DealerInvoice() {
           {previewId && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto w-full">
-                <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+                <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center gap-4">
                   <h2 className="text-xl font-semibold">Invoice Preview</h2>
-                  <Button
-                    onClick={() => setPreviewId(null)}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => downloadPDF(previewId)}
+                      variant="outline"
+                      size="sm"
+                      className="flex gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download PDF
+                    </Button>
+                    <Button
+                      onClick={() => setPreviewId(null)}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="p-6">
                   {invoices.find((i) => i.id === previewId) && (
