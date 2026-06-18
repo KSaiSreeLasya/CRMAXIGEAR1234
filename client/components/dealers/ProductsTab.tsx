@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, Download, Edit, Eye, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import ProductInvoiceContent from "@/components/dealers/ProductInvoiceContent";
 
 interface Dealer {
   id?: string;
@@ -53,6 +54,8 @@ export default function ProductsTab({
   onDeleteProduct,
 }: ProductsTabProps) {
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Omit<Product, "id">>({
     model_no: "",
     dealer_name: "",
@@ -109,6 +112,47 @@ export default function ProductsTab({
         mode_of_payment: "",
       });
       setShowForm(false);
+      setEditingId(null);
+    }
+  };
+
+  const handleEdit = (product: Product) => {
+    setFormData({
+      model_no: product.model_no,
+      dealer_name: product.dealer_name,
+      dealer_code: product.dealer_code,
+      contact_no: product.contact_no,
+      location: product.location,
+      product_description: product.product_description,
+      hsn_no: product.hsn_no,
+      no_of_vehicles: product.no_of_vehicles,
+      chassis_no: product.chassis_no,
+      motor_no: product.motor_no,
+      battery_no: product.battery_no,
+      battery_vehicle_specs: product.battery_vehicle_specs,
+      battery_warranty: product.battery_warranty,
+      battery_capacity: product.battery_capacity,
+      vehicle_warranty: product.vehicle_warranty,
+      invoice_date: product.invoice_date,
+      amount: product.amount,
+      mode_of_payment: product.mode_of_payment,
+    });
+    setEditingId(product.id || null);
+    setShowForm(true);
+    window.scrollTo(0, 0);
+  };
+
+  const downloadPDF = async (product: Product) => {
+    try {
+      const element = document.getElementById(`product-invoice-preview-${product.id}`);
+      if (!element) return;
+
+      const html2pdf = (await import("html2pdf.js")).default;
+      const pdf = html2pdf();
+      pdf.from(element).save(`Product-${product.model_no}-Invoice.pdf`);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      alert("Unable to download PDF");
     }
   };
 
@@ -481,12 +525,39 @@ export default function ProductsTab({
                     <TableCell>{product.amount}</TableCell>
                     <TableCell>{product.mode_of_payment}</TableCell>
                     <TableCell className="text-right">
-                      <button
-                        onClick={() => onDeleteProduct(product.id!)}
-                        className="inline-flex items-center gap-2 text-destructive hover:text-destructive/80 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-2 items-center justify-end">
+                        <Button
+                          onClick={() => setPreviewId(product.id || null)}
+                          variant="outline"
+                          size="sm"
+                          title="Preview Invoice"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={() => downloadPDF(product)}
+                          variant="outline"
+                          size="sm"
+                          title="Download PDF"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={() => handleEdit(product)}
+                          variant="outline"
+                          size="sm"
+                          title="Edit Product"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <button
+                          onClick={() => onDeleteProduct(product.id!)}
+                          className="inline-flex items-center gap-2 text-destructive hover:text-destructive/80 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -495,6 +566,34 @@ export default function ProductsTab({
           </div>
         )}
       </div>
+
+      {/* Invoice Preview Modal */}
+      {previewId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto w-full">
+            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Product Invoice Preview</h2>
+              <Button
+                onClick={() => setPreviewId(null)}
+                variant="ghost"
+                size="sm"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="p-6">
+              {products.find((p) => p.id === previewId) && (
+                <div id={`product-invoice-preview-${previewId}`}>
+                  <ProductInvoiceContent
+                    product={products.find((p) => p.id === previewId)!}
+                    gstType="cgst-sgst"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
