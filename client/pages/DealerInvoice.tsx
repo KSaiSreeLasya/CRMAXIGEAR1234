@@ -153,14 +153,14 @@ export default function DealerInvoice() {
       if (supabase) {
         try {
           const { data } = await supabase
-            .from("dealer_invoices")
+            .from("dealers_invoices")
             .select("*");
           if (data) {
             setInvoices(data);
             return;
           }
         } catch (error) {
-          console.warn("Supabase dealer_invoices fetch failed, using localStorage");
+          console.warn("Supabase dealers_invoices fetch failed, using localStorage");
         }
       }
 
@@ -266,7 +266,7 @@ export default function DealerInvoice() {
         try {
           if (editingId) {
             await supabase
-              .from("dealer_invoices")
+              .from("dealers_invoices")
               .update(invoiceRecord)
               .eq("id", invoiceId);
 
@@ -277,7 +277,7 @@ export default function DealerInvoice() {
               .eq("invoice_id", invoiceId);
           } else {
             await supabase
-              .from("dealer_invoices")
+              .from("dealers_invoices")
               .insert([invoiceRecord]);
           }
 
@@ -358,7 +358,7 @@ export default function DealerInvoice() {
     try {
       if (supabase) {
         try {
-          await supabase.from("dealer_invoices").delete().eq("id", id);
+          await supabase.from("dealers_invoices").delete().eq("id", id);
         } catch (error) {
           console.warn("Supabase delete failed, using localStorage");
         }
@@ -411,12 +411,30 @@ export default function DealerInvoice() {
         return;
       }
 
+      // Wait for all images to load before generating PDF
+      const images = element.querySelectorAll('img');
+      const imagePromises = Array.from(images).map(img => {
+        return new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve(); // Still proceed if image fails
+          }
+        });
+      });
+
+      await Promise.all(imagePromises);
+
+      // Add a small delay to ensure rendering is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const html2pdf = (await import("html2pdf.js")).default;
       const options = {
         margin: 10,
         filename: `${invoice.dealerInvoiceNo}.pdf`,
         image: { type: "png", quality: 0.98 },
-        html2canvas: { scale: 2 },
+        html2canvas: { scale: 2, allowTaint: true, useCORS: true },
         jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
       };
 
@@ -816,8 +834,8 @@ export default function DealerInvoice() {
                             )}
                           </div>
                           <div className="flex justify-between font-semibold border-t pt-2">
-                            <span>Total:</span>
-                            <span>₹{total.toFixed(2)}</span>
+                            <span>TOTAL AMOUNT:</span>
+                            <span className="text-green-600">₹{total.toFixed(2)}</span>
                           </div>
                         </>
                       )}
