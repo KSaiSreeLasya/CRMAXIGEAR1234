@@ -152,15 +152,17 @@ export default function DealerInvoice() {
     try {
       if (supabase) {
         try {
-          const { data } = await supabase
-            .from("dealers_invoices")
+          const { data, error } = await supabase
+            .from("dealer_invoices")
             .select("*");
-          if (data) {
+          if (error) {
+            console.warn("Supabase dealer_invoices fetch failed:", error);
+          } else if (data) {
             setInvoices(data);
             return;
           }
         } catch (error) {
-          console.warn("Supabase dealers_invoices fetch failed, using localStorage");
+          console.warn("Supabase dealer_invoices fetch failed, using localStorage");
         }
       }
 
@@ -265,14 +267,24 @@ export default function DealerInvoice() {
       if (supabase && !isLoading) {
         try {
           if (editingId) {
-            await supabase
-              .from("dealers_invoices")
+            const { error } = await supabase
+              .from("dealer_invoices")
               .update(invoiceRecord)
               .eq("id", invoiceId);
+
+            if (error) {
+              console.error("Supabase update error:", error);
+              throw error;
+            }
           } else {
-            await supabase
-              .from("dealers_invoices")
+            const { error } = await supabase
+              .from("dealer_invoices")
               .insert([invoiceRecord]);
+
+            if (error) {
+              console.error("Supabase insert error:", error);
+              throw error;
+            }
           }
 
           alert("Invoice saved to Supabase successfully!");
@@ -330,7 +342,10 @@ export default function DealerInvoice() {
     try {
       if (supabase) {
         try {
-          await supabase.from("dealers_invoices").delete().eq("id", id);
+          const { error } = await supabase.from("dealer_invoices").delete().eq("id", id);
+          if (error) {
+            console.warn("Supabase delete error:", error);
+          }
         } catch (error) {
           console.warn("Supabase delete failed, using localStorage");
         }
