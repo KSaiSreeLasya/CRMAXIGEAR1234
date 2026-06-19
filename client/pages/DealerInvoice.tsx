@@ -164,14 +164,14 @@ export default function DealerInvoice() {
       if (supabase) {
         try {
           const { data } = await supabase
-            .from("dealer_invoices")
+            .from("dealers_invoices")
             .select("*");
           if (data) {
             setInvoices(data);
             return;
           }
         } catch (error) {
-          console.warn("Supabase dealer_invoices fetch failed, using localStorage");
+          console.warn("Supabase dealers_invoices fetch failed, using localStorage");
         }
       }
 
@@ -264,7 +264,6 @@ export default function DealerInvoice() {
         lead_source: form.leadSource || null,
         labour_charges: form.labourCharges || 0,
         subtotal: productTotal,
-        gst_enabled: form.gstEnabled,
         total_gst_amount: gstAmount,
         total_amount: total,
         payment_status: "pending",
@@ -277,7 +276,7 @@ export default function DealerInvoice() {
         try {
           if (editingId) {
             await supabase
-              .from("dealer_invoices")
+              .from("dealers_invoices")
               .update(invoiceRecord)
               .eq("id", invoiceId);
 
@@ -288,7 +287,7 @@ export default function DealerInvoice() {
               .eq("invoice_id", invoiceId);
           } else {
             await supabase
-              .from("dealer_invoices")
+              .from("dealers_invoices")
               .insert([invoiceRecord]);
           }
 
@@ -369,7 +368,7 @@ export default function DealerInvoice() {
     try {
       if (supabase) {
         try {
-          await supabase.from("dealer_invoices").delete().eq("id", id);
+          await supabase.from("dealers_invoices").delete().eq("id", id);
         } catch (error) {
           console.warn("Supabase delete failed, using localStorage");
         }
