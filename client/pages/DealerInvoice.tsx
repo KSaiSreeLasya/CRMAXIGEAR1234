@@ -411,12 +411,30 @@ export default function DealerInvoice() {
         return;
       }
 
+      // Wait for all images to load before generating PDF
+      const images = element.querySelectorAll('img');
+      const imagePromises = Array.from(images).map(img => {
+        return new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve(); // Still proceed if image fails
+          }
+        });
+      });
+
+      await Promise.all(imagePromises);
+
+      // Add a small delay to ensure rendering is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const html2pdf = (await import("html2pdf.js")).default;
       const options = {
         margin: 10,
         filename: `${invoice.dealerInvoiceNo}.pdf`,
         image: { type: "png", quality: 0.98 },
-        html2canvas: { scale: 2 },
+        html2canvas: { scale: 2, allowTaint: true, useCORS: true },
         jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
       };
 
