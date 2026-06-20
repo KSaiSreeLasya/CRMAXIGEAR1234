@@ -1,6 +1,7 @@
 import Layout from "@/components/Layout";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,70 +45,108 @@ export default function Delivery() {
   }, []);
 
   const fetchDeliveries = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/deliveries");
-      const data = await response.json();
-      setDeliveries(data);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch deliveries",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
 
+    const { data, error } = await supabase
+      .from("deliveries")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Fetch Error:", error);
+      throw error;
+    }
+
+    setDeliveries(data || []);
+  } catch (error) {
+    console.error("Failed to fetch deliveries:", error);
+
+    toast({
+      title: "Error",
+      description: "Failed to fetch deliveries",
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!formData.project_name || !formData.deliverables || !formData.delivery_date) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
+  if (
+    !formData.project_name ||
+    !formData.deliverables ||
+    !formData.delivery_date
+  ) {
+    toast({
+      title: "Error",
+      description: "Please fill in all required fields",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    let error;
+
+    if (editingId) {
+      const result = await supabase
+        .from("deliveries")
+        .update({
+          project_name: formData.project_name,
+          deliverables: formData.deliverables,
+          delivery_date: formData.delivery_date,
+          status: formData.status,
+        })
+        .eq("id", editingId);
+
+      error = result.error;
+    } else {
+      const result = await supabase
+        .from("deliveries")
+        .insert([
+          {
+            project_name: formData.project_name,
+            deliverables: formData.deliverables,
+            delivery_date: formData.delivery_date,
+            status: formData.status,
+          },
+        ]);
+
+      error = result.error;
     }
 
-    try {
-      const endpoint = editingId ? `/api/deliveries/${editingId}` : "/api/deliveries";
-      const method = editingId ? "PUT" : "POST";
+    if (error) throw error;
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+    toast({
+      title: "Success",
+      description: editingId
+        ? "Delivery updated successfully"
+        : "Delivery created successfully",
+    });
 
-      if (!response.ok) throw new Error("Failed to save delivery");
+    setFormData({
+      project_name: "",
+      deliverables: "",
+      delivery_date: "",
+      status: "pending",
+    });
 
-      toast({
-        title: "Success",
-        description: editingId
-          ? "Delivery updated successfully"
-          : "Delivery created successfully",
-      });
+    setIsAdding(false);
+    setEditingId(null);
 
-      setFormData({
-        project_name: "",
-        deliverables: "",
-        delivery_date: "",
-        status: "pending",
-      });
-      setIsAdding(false);
-      setEditingId(null);
-      await fetchDeliveries();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save delivery",
-        variant: "destructive",
-      });
-    }
-  };
+    await fetchDeliveries();
+  } catch (error) {
+    console.error(error);
+
+    toast({
+      title: "Error",
+      description: "Failed to save delivery",
+      variant: "destructive",
+    });
+  }
+};
 
   const handleEdit = (delivery: Delivery) => {
     setFormData({
@@ -121,29 +160,32 @@ export default function Delivery() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this delivery?")) return;
+  if (!confirm("Are you sure you want to delete this delivery?")) return;
 
-    try {
-      const response = await fetch(`/api/deliveries/${id}`, {
-        method: "DELETE",
-      });
+  try {
+    const { error } = await supabase
+      .from("deliveries")
+      .delete()
+      .eq("id", id);
 
-      if (!response.ok) throw new Error("Failed to delete delivery");
+    if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Delivery deleted successfully",
-      });
+    toast({
+      title: "Success",
+      description: "Delivery deleted successfully",
+    });
 
-      await fetchDeliveries();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete delivery",
-        variant: "destructive",
-      });
-    }
-  };
+    await fetchDeliveries();
+  } catch (error) {
+    console.error(error);
+
+    toast({
+      title: "Error",
+      description: "Failed to delete delivery",
+      variant: "destructive",
+    });
+  }
+};
 
   const handleCancel = () => {
     setFormData({
