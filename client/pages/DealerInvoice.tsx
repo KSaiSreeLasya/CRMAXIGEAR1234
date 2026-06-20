@@ -264,6 +264,7 @@ const loadInvoices = async () => {
       const createdAtTime = editingId ? invoices.find(i => i.id === editingId)?.createdAt || new Date().toISOString() : new Date().toISOString();
 
       const invoiceRecord = {
+        id: invoiceId,
       
         invoice_number: form.dealerInvoiceNo,
         invoice_date: form.invoiceDate,
@@ -313,6 +314,54 @@ const loadInvoices = async () => {
       if (result.error) {
         throw result.error;
 }
+
+      // After invoice is saved, save invoice items to dealers_invoice_items
+      try {
+        // Prepare items payload
+        
+        const items = form.products.map((p) => {
+          const quantity = p.unit || 1;
+          const unit_price = Number(p.amount || 0);
+          const line_total = Number((unit_price * quantity).toFixed(2));
+          const gst_rate = Number(p.gstRate || 18);
+          const gst_amount = Math.round((line_total * gst_rate) / 100);
+          const line_amount_with_gst = Number((line_total + gst_amount).toFixed(2));
+
+          return {
+            invoice_id: invoiceId,
+            product_name: p.product || "",
+            product_description: p.productDescription || null,
+            quantity,
+            unit_price,
+            line_total,
+            gst_rate,
+            gst_amount,
+            line_amount_with_gst,
+          };
+        });
+
+        if (editingId) {
+          // Remove old items for this invoice and re-insert
+          const { error: deleteErr } = await supabase
+            .from("dealers_invoice_items")
+            .delete()
+            .eq("invoice_id", invoiceId);
+          if (deleteErr) console.warn("Failed to delete old invoice items:", deleteErr);
+        }
+
+        if (items.length > 0) {
+          const { data: itemsData, error: itemsErr } = await supabase
+            .from("dealers_invoice_items")
+            .insert(items);
+          if (itemsErr) {
+            console.warn("Failed to insert invoice items:", itemsErr);
+          } else {
+            console.log("Inserted invoice items:", itemsData?.length);
+          }
+        }
+      } catch (err) {
+        console.error("Error saving invoice items to Supabase:", err);
+      }
 
       alert("Invoice saved to Supabase successfully!");
 
