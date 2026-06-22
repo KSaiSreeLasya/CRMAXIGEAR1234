@@ -51,6 +51,18 @@ export default function Dashboard() {
             </p>
           </div>
 
+          {upcomingDeliveryCount > 0 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
+              <AlertCircle className="h-6 w-6 text-orange-600 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-orange-900">Upcoming Deliveries</h3>
+                <p className="text-sm text-orange-800">
+                  You have <span className="font-bold">{upcomingDeliveryCount}</span> delivery{upcomingDeliveryCount !== 1 ? 'ies' : ''} due in the next 7 days. Click the DELIVERY tile to view details.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl">
             <Link
               to="/projects"
@@ -173,14 +185,8 @@ export default function Dashboard() {
 
             <Link
               to="/delivery"
-              className="rounded-lg border border-border bg-card p-6 text-left hover:border-primary hover:shadow-md transition-all relative"
+              className="rounded-lg border border-border bg-card p-6 text-left hover:border-primary hover:shadow-md transition-all"
             >
-              {upcomingDeliveryCount > 0 && (
-                <div className="absolute top-4 right-4 flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-semibold">
-                  <AlertCircle className="h-4 w-4" />
-                  {upcomingDeliveryCount} due soon
-                </div>
-              )}
               <div className="flex items-center gap-4">
                 <div className="rounded-md bg-pink-100 p-3 text-pink-700">
                   <Truck className="h-6 w-6" />
