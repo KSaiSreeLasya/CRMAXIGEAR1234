@@ -9,6 +9,7 @@ import DealerInvoiceContent from "@/components/DealerInvoiceContent";
 import { ImportExport } from "@/components/ImportExport";
 import { SplitPaymentForm, type SplitPayment } from "@/components/SplitPaymentForm";
 import { PaymentHistoryDisplay } from "@/components/PaymentHistoryDisplay";
+import { cn } from "@/lib/cn";
 
 interface ProductRow {
   id?: string;
@@ -22,6 +23,28 @@ interface ProductRow {
 interface DealerInvoiceRecord {
   id: string;
   dealerInvoiceNo: string;
+  dealerName: string;
+  dealerId?: string;
+  contactNo: string;
+  location: string;
+  invoiceDate: string;
+  dueDate: string;
+  poNumber: string;
+  sentTo: string;
+  shipTo: string;
+  products: ProductRow[];
+  total: number;
+  labourCharges: number;
+  gstEnabled: boolean;
+  gstAmount: number;
+  modeOfPayment: string;
+  leadSource: string;
+  createdAt: string;
+}
+
+interface SparesInvoiceRecord {
+  id: string;
+  sparesInvoiceNo: string;
   dealerName: string;
   dealerId?: string;
   contactNo: string;
@@ -124,20 +147,62 @@ function getNextDealerInvoiceNumber(): string {
   return `${prefix}${nextValue}`;
 }
 
+function getNextSparesInvoiceNumber(): string {
+  const defaultInvoiceNo = "SPARE/2026-27/001";
+  let maxInvoiceNo = defaultInvoiceNo;
+  let maxNumericSuffix = 0;
+
+  try {
+    const saved = localStorage.getItem("crm_spares_invoices");
+    if (saved) {
+      const invoices = JSON.parse(saved) as SparesInvoiceRecord[];
+      invoices.forEach((inv) => {
+        const invoice = inv.sparesInvoiceNo?.trim();
+        if (!invoice) return;
+
+        const match = invoice.match(/^(.*?)(\d+)$/);
+        if (!match) return;
+        const numericValue = Number(match[2]);
+        if (Number.isNaN(numericValue)) return;
+
+        if (numericValue > maxNumericSuffix) {
+          maxNumericSuffix = numericValue;
+          maxInvoiceNo = invoice;
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error deriving next spares invoice number:", error);
+  }
+
+  const lastMatch = maxInvoiceNo.match(/^(.*?)(\d+)$/);
+  if (!lastMatch) return defaultInvoiceNo;
+  const prefix = lastMatch[1];
+  const width = lastMatch[2].length;
+  const nextValue = String(Number(lastMatch[2]) + 1).padStart(width, "0");
+  return `${prefix}${nextValue}`;
+}
+
 export default function DealerInvoice() {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<DealerInvoiceRecord[]>([]);
+  const [sparesInvoices, setSparesInvoices] = useState<SparesInvoiceRecord[]>([]);
   const [dealers, setDealers] = useState<any[]>([]);
   const [form, setForm] = useState<InvoiceForm>(DEFAULT_FORM);
+  const [sparesForm, setSparesForm] = useState<InvoiceForm>(DEFAULT_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSparesId, setEditingSparesId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDealers, setIsLoadingDealers] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [sparesPreviewId, setSparesPreviewId] = useState<string | null>(null);
   const [gstType, setGstType] = useState<"igst" | "cgst-sgst">("cgst-sgst");
+  const [activeTab, setActiveTab] = useState<"products" | "spares">("products");
 
   useEffect(() => {
     void loadInvoices();
+    void loadSparesInvoices();
     void loadDealers();
     if (!editingId) {
       setForm((prev) => ({
@@ -145,7 +210,13 @@ export default function DealerInvoice() {
         dealerInvoiceNo: getNextDealerInvoiceNumber(),
       }));
     }
-  }, [editingId]);
+    if (!editingSparesId) {
+      setSparesForm((prev) => ({
+        ...prev,
+        dealerInvoiceNo: getNextSparesInvoiceNumber(),
+      }));
+    }
+  }, [editingId, editingSparesId]);
 
 const loadInvoices = async () => {
   setIsLoading(true);
@@ -220,6 +291,73 @@ const loadInvoices = async () => {
   }
 };
 
+const loadSparesInvoices = async () => {
+  try {
+    if (!supabase) {
+      const saved = localStorage.getItem("crm_spares_invoices");
+      setSparesInvoices(saved ? JSON.parse(saved) : []);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("spares_invoices")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const mappedInvoices: SparesInvoiceRecord[] = await Promise.all((data || []).map(async (row: any) => {
+      let products: ProductRow[] = [];
+      try {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from("spares_invoice_products")
+          .select("*")
+          .eq("spares_invoice_id", row.id);
+
+        if (!itemsError && itemsData) {
+          products = itemsData.map((item: any) => ({
+            id: item.id,
+            product: item.product_name || "",
+            productDescription: item.description || "",
+            amount: Number(item.unit_price || 0),
+            unit: Number(item.unit_quantity || 1),
+            gstRate: Number(item.gst_rate || 18),
+          }));
+        }
+      } catch (err) {
+        console.warn("Failed to load spares invoice items for invoice", row.id, err);
+      }
+
+      return {
+        id: row.id,
+        sparesInvoiceNo: row.spares_invoice_no,
+        dealerName: row.dealer_name,
+        dealerId: row.dealer_id,
+        contactNo: row.contact_no || "",
+        location: row.location || "",
+        invoiceDate: row.invoice_date,
+        dueDate: row.due_date || "",
+        poNumber: row.po_number || "",
+        sentTo: row.sent_to || "",
+        shipTo: row.ship_to || "",
+        products,
+        total: Number(row.total || 0),
+        labourCharges: Number(row.labour_charges || 0),
+        gstEnabled: row.gst_enabled ?? true,
+        gstAmount: Number(row.gst_amount || 0),
+        modeOfPayment: row.mode_of_payment || "",
+        leadSource: row.lead_source || "",
+        createdAt: row.created_at,
+      };
+    }));
+
+    setSparesInvoices(mappedInvoices);
+  } catch (error) {
+    console.error("Load Spares Invoices Error:", error);
+    const saved = localStorage.getItem("crm_spares_invoices");
+    setSparesInvoices(saved ? JSON.parse(saved) : []);
+  }
+};
 
   const loadDealers = async () => {
     setIsLoadingDealers(true);
@@ -553,16 +691,244 @@ const loadInvoices = async () => {
     alert(`Imported ${imported.length} invoices`);
   };
 
+  const saveSparesInvoice = async () => {
+    if (!sparesForm.dealerName || !sparesForm.dealerInvoiceNo || sparesForm.products.length === 0) {
+      alert("Please fill in dealer name, invoice number, and at least one product");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { productTotal, gstAmount, total } = calculateInvoiceTotal(
+        sparesForm.products,
+        sparesForm.labourCharges
+      );
+
+      const invoiceId = editingSparesId || crypto.randomUUID();
+      const createdAtTime = editingSparesId ? sparesInvoices.find(i => i.id === editingSparesId)?.createdAt || new Date().toISOString() : new Date().toISOString();
+
+      const invoiceRecord = {
+        id: invoiceId,
+        spares_invoice_no: sparesForm.dealerInvoiceNo,
+        invoice_date: sparesForm.invoiceDate,
+        due_date: sparesForm.dueDate || null,
+        dealer_id: null,
+        dealer_name: sparesForm.dealerName,
+        contact_no: sparesForm.contactNo || null,
+        location: sparesForm.location || null,
+        po_number: sparesForm.poNumber || null,
+        sent_to: sparesForm.sentTo || null,
+        ship_to: sparesForm.shipTo || null,
+        mode_of_payment: sparesForm.modeOfPayment || null,
+        lead_source: sparesForm.leadSource || null,
+        labour_charges: sparesForm.labourCharges || 0,
+        subtotal: productTotal,
+        gst_enabled: sparesForm.gstEnabled,
+        gst_amount: gstAmount,
+        total: total,
+      };
+
+      if (supabase) {
+        try {
+          let result;
+          if (editingSparesId) {
+            result = await supabase
+              .from("spares_invoices")
+              .update(invoiceRecord)
+              .eq("id", invoiceId)
+              .select();
+          } else {
+            result = await supabase
+              .from("spares_invoices")
+              .insert([invoiceRecord])
+              .select();
+          }
+
+          if (result.error) throw result.error;
+
+          const items = sparesForm.products.map((p) => {
+            const quantity = p.unit || 1;
+            const unit_price = Number(p.amount || 0);
+            const line_total = Number((unit_price * quantity).toFixed(2));
+            const gst_rate = Number(p.gstRate || 18);
+            const gst_amount = Math.round((line_total * gst_rate) / 100);
+
+            return {
+              spares_invoice_id: invoiceId,
+              product_name: p.product || "",
+              description: p.productDescription || null,
+              unit_quantity: quantity,
+              unit_price,
+              gst_rate,
+              line_total,
+              gst_amount,
+            };
+          });
+
+          if (editingSparesId) {
+            const { error: deleteErr } = await supabase
+              .from("spares_invoice_products")
+              .delete()
+              .eq("spares_invoice_id", invoiceId);
+            if (deleteErr) console.warn("Failed to delete old items:", deleteErr);
+          }
+
+          if (items.length > 0) {
+            const { error: itemsErr } = await supabase
+              .from("spares_invoice_products")
+              .insert(items);
+            if (itemsErr) console.warn("Failed to insert items:", itemsErr);
+          }
+
+          alert("Spares invoice saved successfully!");
+          await loadSparesInvoices();
+        } catch (error) {
+          console.error("Supabase Save Error:", error);
+          alert(`Error: ${JSON.stringify(error)}`);
+        }
+      }
+
+      const record: SparesInvoiceRecord = {
+        id: invoiceId,
+        sparesInvoiceNo: sparesForm.dealerInvoiceNo,
+        dealerName: sparesForm.dealerName,
+        contactNo: sparesForm.contactNo,
+        location: sparesForm.location,
+        invoiceDate: sparesForm.invoiceDate,
+        dueDate: sparesForm.dueDate,
+        poNumber: sparesForm.poNumber,
+        sentTo: sparesForm.sentTo,
+        shipTo: sparesForm.shipTo,
+        products: sparesForm.products,
+        total,
+        labourCharges: sparesForm.labourCharges,
+        gstEnabled: sparesForm.gstEnabled,
+        gstAmount,
+        modeOfPayment: sparesForm.modeOfPayment,
+        leadSource: sparesForm.leadSource,
+        createdAt: createdAtTime,
+      };
+
+      const current = localStorage.getItem("crm_spares_invoices");
+      const invoicesList: SparesInvoiceRecord[] = current ? JSON.parse(current) : [];
+
+      if (editingSparesId) {
+        const idx = invoicesList.findIndex(i => i.id === editingSparesId);
+        if (idx >= 0) invoicesList[idx] = record;
+      } else {
+        invoicesList.push(record);
+      }
+
+      localStorage.setItem("crm_spares_invoices", JSON.stringify(invoicesList));
+      setSparesInvoices(invoicesList);
+      setSparesForm(DEFAULT_FORM);
+      setEditingSparesId(null);
+      setSparesPreviewId(null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteSparesInvoice = async (id: string) => {
+    if (!confirm("Are you sure?")) return;
+
+    try {
+      if (supabase) {
+        try {
+          await supabase.from("spares_invoices").delete().eq("id", id);
+        } catch (error) {
+          console.warn("Supabase delete failed, using localStorage");
+        }
+      }
+
+      const current = localStorage.getItem("crm_spares_invoices");
+      const invoicesList: SparesInvoiceRecord[] = current ? JSON.parse(current) : [];
+      const updated = invoicesList.filter(i => i.id !== id);
+      localStorage.setItem("crm_spares_invoices", JSON.stringify(updated));
+      setSparesInvoices(updated);
+    } catch (error) {
+      console.error("Error deleting spares invoice:", error);
+    }
+  };
+
+  const editSparesInvoice = (id: string) => {
+    const invoice = sparesInvoices.find(i => i.id === id);
+    if (invoice) {
+      setSparesForm({
+        dealerInvoiceNo: invoice.sparesInvoiceNo,
+        dealerName: invoice.dealerName,
+        contactNo: invoice.contactNo,
+        location: invoice.location,
+        invoiceDate: invoice.invoiceDate,
+        dueDate: invoice.dueDate || "",
+        poNumber: invoice.poNumber || "",
+        sentTo: invoice.sentTo || "",
+        shipTo: invoice.shipTo || "",
+        products: invoice.products,
+        labourCharges: invoice.labourCharges,
+        gstEnabled: invoice.gstEnabled,
+        modeOfPayment: invoice.modeOfPayment,
+        leadSource: invoice.leadSource,
+        splitPayments: [],
+      });
+      setEditingSparesId(id);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const downloadSparesInvoicePDF = async (id: string) => {
+    const invoice = sparesInvoices.find(i => i.id === id);
+    if (!invoice) return;
+
+    try {
+      const element = document.getElementById(`spares-invoice-preview-${id}`);
+      if (!element) {
+        alert("Invoice preview not found. Please try again.");
+        return;
+      }
+
+      const images = element.querySelectorAll('img');
+      const imagePromises = Array.from(images).map(img => {
+        return new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          }
+        });
+      });
+
+      await Promise.all(imagePromises);
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const html2pdf = (await import("html2pdf.js")).default;
+      const options = {
+        margin: 10,
+        filename: `${invoice.sparesInvoiceNo}.pdf`,
+        image: { type: "png", quality: 0.98 },
+        html2canvas: { scale: 2, allowTaint: true, useCORS: true },
+        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+      };
+
+      html2pdf().set(options).from(element).save();
+      alert("PDF downloaded successfully!");
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      alert("Unable to download PDF. Please check browser console.");
+    }
+  };
+
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold mb-2">Dealer Invoices</h1>
               <p className="text-muted-foreground">
-                Manage dealer product invoices with multiple items
+                Manage dealer product and spares invoices
               </p>
             </div>
             <Button
@@ -573,6 +939,32 @@ const loadInvoices = async () => {
               <ArrowLeft className="w-4 h-4" />
               Back to Dashboard
             </Button>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex gap-2 border-b bg-background">
+            <button
+              onClick={() => setActiveTab("products")}
+              className={cn(
+                "px-4 py-2 font-medium text-sm border-b-2 -mb-px transition-colors",
+                activeTab === "products"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Product Invoices
+            </button>
+            <button
+              onClick={() => setActiveTab("spares")}
+              className={cn(
+                "px-4 py-2 font-medium text-sm border-b-2 -mb-px transition-colors",
+                activeTab === "spares"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Spares Invoices
+            </button>
           </div>
 
           {/* Form Section */}
