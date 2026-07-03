@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLiveDealerNetwork } from '@/hooks/use-live-dealer-network';
 import { DocumentPreviewer } from './DocumentPreviewer';
 import { downloadTaxInvoiceHTML } from '@/lib/invoice-generator';
@@ -7,14 +7,40 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, FileText, Package, Wrench } from 'lucide-react';
+import { fetchDMSDealers } from '@/lib/dealers';
+
+interface Dealer {
+  id: string;
+  name: string;
+  [key: string]: any;
+}
 
 export function DealerAuditDashboard() {
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
-  const { dealers, inventory, sales, services, loading } = useLiveDealerNetwork(selectedDealerId);
+  const [dealersList, setDealersList] = useState<Dealer[]>([]);
+  const [dealersLoading, setDealersLoading] = useState(true);
+  const { dealers: hookDealers, inventory, sales, services, loading } = useLiveDealerNetwork(selectedDealerId);
 
+  // Fetch dealers independently to ensure they're always available
+  useEffect(() => {
+    async function loadDealers() {
+      setDealersLoading(true);
+      try {
+        const data = await fetchDMSDealers();
+        console.log('DealerAuditDashboard - Loaded dealers:', data?.length, data);
+        setDealersList(data || []);
+      } catch (error) {
+        console.error('Error loading dealers in DealerAuditDashboard:', error);
+        setDealersList([]);
+      } finally {
+        setDealersLoading(false);
+      }
+    }
+    loadDealers();
+  }, []);
+
+  const dealers = dealersList.length > 0 ? dealersList : hookDealers;
   const selectedDealer = dealers.find(d => d.id === selectedDealerId);
-
-  console.log('DealerAuditDashboard - dealers:', dealers, 'loading:', loading);
 
   return (
     <div className="space-y-6">
@@ -31,7 +57,11 @@ export function DealerAuditDashboard() {
           <CardTitle>Select Dealer</CardTitle>
         </CardHeader>
         <CardContent>
-          {dealers.length === 0 ? (
+          {dealersLoading ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <p>Loading dealers...</p>
+            </div>
+          ) : dealers.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
               <p>No dealers found. Please add dealers first in the "Manage Dealers" tab.</p>
             </div>
