@@ -46,32 +46,87 @@ export async function allocateInventoryToDealer(allocation: {
   const transferId = `TRSF-${Math.floor(1000 + Math.random() * 9000)}`;
   const today = new Date().toISOString().split("T")[0];
 
-  const { data, error } = await supabase
-    .from("dms_inventory_transfers")
-    .insert([
-      {
-        id: transferId,
-        sku: allocation.sku,
-        name: allocation.productName,
-        category: allocation.category,
-        quantity: allocation.quantity,
-        sender: "Central HQ (crm.axigearelectric.com)",
-        receiver_id: allocation.dealerId,
-        status: "Pending Acceptance",
-        date: today,
-        chassis_no: allocation.chassisNo || null,
-        motor_no: allocation.motorNo || null,
-        battery_no: allocation.batteryNo || null,
-      },
-    ])
-    .select("*");
+  try {
+    // First, reduce inventory immediately
+    if (allocation.category === "vehicles") {
+      const { data: inventoryData, error: invFetchError } = await supabase
+        .from("inventory_items")
+        .select("id, vehicle_count, sales_count, closing_stock")
+        .ilike("model_no", `%${allocation.sku}%`)
+        .single();
 
-  if (error) {
-    console.error("Failed to dispatch shipment:", error.message);
+      if (!invFetchError && inventoryData) {
+        const newVehicleCount = Math.max(0, inventoryData.vehicle_count - allocation.quantity);
+        const newClosingStock = newVehicleCount - inventoryData.sales_count;
+
+        const { error: updateInventoryError } = await supabase
+          .from("inventory_items")
+          .update({
+            vehicle_count: newVehicleCount,
+            closing_stock: Math.max(0, newClosingStock),
+          })
+          .eq("id", inventoryData.id);
+
+        if (updateInventoryError) {
+          console.error("Error reducing vehicle inventory:", updateInventoryError.message);
+          return null;
+        }
+      }
+    } else if (allocation.category === "spares") {
+      const { data: spareData, error: spareFetchError } = await supabase
+        .from("spares_inventory")
+        .select("id, qty")
+        .ilike("part_name", `%${allocation.sku}%`)
+        .single();
+
+      if (!spareFetchError && spareData) {
+        const newQty = Math.max(0, spareData.qty - allocation.quantity);
+
+        const { error: updateSpareError } = await supabase
+          .from("spares_inventory")
+          .update({
+            qty: newQty,
+          })
+          .eq("id", spareData.id);
+
+        if (updateSpareError) {
+          console.error("Error reducing spare inventory:", updateSpareError.message);
+          return null;
+        }
+      }
+    }
+
+    // Create the transfer record
+    const { data, error } = await supabase
+      .from("dms_inventory_transfers")
+      .insert([
+        {
+          id: transferId,
+          sku: allocation.sku,
+          name: allocation.productName,
+          category: allocation.category,
+          quantity: allocation.quantity,
+          sender: "Central HQ (crm.axigearelectric.com)",
+          receiver_id: allocation.dealerId,
+          status: "Pending Acceptance",
+          date: today,
+          chassis_no: allocation.chassisNo || null,
+          motor_no: allocation.motorNo || null,
+          battery_no: allocation.batteryNo || null,
+        },
+      ])
+      .select("*");
+
+    if (error) {
+      console.error("Failed to dispatch shipment:", error.message);
+      return null;
+    }
+
+    return data?.[0] || null;
+  } catch (error) {
+    console.error("Error in allocateInventoryToDealer:", error);
     return null;
   }
-
-  return data?.[0] || null;
 }
 
 export async function updateTransferStatus(
@@ -81,40 +136,23 @@ export async function updateTransferStatus(
   if (!supabase) return false;
 
   try {
-    // Update the transfer status
-    const { error: updateError } = await supabase
+    // Fetch the transfer details first to determine what to do
+    const { data: transferData, error: fetchError } = await supabase
       .from("dms_inventory_transfers")
-      .update({ status })
-      .eq("id", transferId);
+      .select("*")
+      .eq("id", transferId)
+      .single();
 
-    if (updateError) {
-      console.error("Error updating transfer status:", updateError.message);
+    if (fetchError || !transferData) {
+      console.error("Error fetching transfer details:", fetchError?.message);
       return false;
     }
 
-    // If status is "Accepted", reduce inventory
-    // If status is "Rejected", restore inventory
-    if (status === "Accepted" || status === "Rejected") {
-      // Fetch the transfer details
-      const { data: transferData, error: fetchError } = await supabase
-        .from("dms_inventory_transfers")
-        .select("*")
-        .eq("id", transferId)
-        .single();
+    const transfer = transferData as any;
 
-      if (fetchError || !transferData) {
-        console.error("Error fetching transfer details:", fetchError?.message);
-        return false;
-      }
-
-      const transfer = transferData as any;
-      const isAccepted = status === "Accepted";
-      const isRejected = status === "Rejected";
-      const quantityChange = isAccepted ? -transfer.quantity : transfer.quantity;
-
-      // Update inventory based on category
+    // If status is "Rejected", restore inventory (inventory was already reduced when dispatched)
+    if (status === "Rejected") {
       if (transfer.category === "vehicles") {
-        // For vehicles, we need to adjust vehicle_count and closing_stock
         const { data: inventoryData, error: invFetchError } = await supabase
           .from("inventory_items")
           .select("id, vehicle_count, sales_count, closing_stock")
@@ -122,24 +160,22 @@ export async function updateTransferStatus(
           .single();
 
         if (!invFetchError && inventoryData) {
-          const newVehicleCount = Math.max(0, inventoryData.vehicle_count + quantityChange);
+          const newVehicleCount = inventoryData.vehicle_count + transfer.quantity;
           const newClosingStock = newVehicleCount - inventoryData.sales_count;
 
           const { error: updateInventoryError } = await supabase
             .from("inventory_items")
             .update({
               vehicle_count: newVehicleCount,
-              closing_stock: Math.max(0, newClosingStock),
+              closing_stock: newClosingStock,
             })
             .eq("id", inventoryData.id);
 
           if (updateInventoryError) {
-            console.error("Error updating inventory:", updateInventoryError.message);
-            // Still return true since transfer status was updated
+            console.error("Error restoring vehicle inventory:", updateInventoryError.message);
           }
         }
       } else if (transfer.category === "spares") {
-        // For spares, adjust qty directly
         const { data: spareData, error: spareFetchError } = await supabase
           .from("spares_inventory")
           .select("id, qty")
@@ -147,7 +183,7 @@ export async function updateTransferStatus(
           .single();
 
         if (!spareFetchError && spareData) {
-          const newQty = Math.max(0, spareData.qty + quantityChange);
+          const newQty = spareData.qty + transfer.quantity;
 
           const { error: updateSpareError } = await supabase
             .from("spares_inventory")
@@ -157,11 +193,21 @@ export async function updateTransferStatus(
             .eq("id", spareData.id);
 
           if (updateSpareError) {
-            console.error("Error updating spare inventory:", updateSpareError.message);
-            // Still return true since transfer status was updated
+            console.error("Error restoring spare inventory:", updateSpareError.message);
           }
         }
       }
+    }
+
+    // Update the transfer status
+    const { error: updateError } = await supabase
+      .from("dms_inventory_transfers")
+      .update({ status })
+      .eq("id", transferId);
+
+    if (updateError) {
+      console.error("Error updating transfer status:", updateError.message);
+      return false;
     }
 
     return true;
