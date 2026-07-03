@@ -27,6 +27,8 @@ interface InventoryItem {
   motorNo?: string;
   batteryNo?: string;
   batteryModel?: string;
+  manufacturerInvNo?: string;
+  salesCount?: number;
   chassisNos?: string[];
   partName?: string;
   price?: number;
@@ -57,9 +59,10 @@ export default function InventoryDispatch() {
         // Fetch vehicles inventory (all vehicles, not filtered by closing_stock)
         const { data: vehiclesData, error: vehiclesError } = await supabase
           .from("inventory_items")
-          .select("id, model_no, brand, vehicle_model, hsn_no, vehicle_count, closing_stock, motor_no, battery_no, battery_model, chassis_no");
+          .select("id, model_no, brand, vehicle_model, hsn_no, vehicle_count, closing_stock, motor_no, battery_no, battery_model, chassis_no, manufacturer_inv_no, sales_count");
 
         if (!vehiclesError && vehiclesData) {
+          console.log(`Loaded ${vehiclesData.length} vehicles from database`, vehiclesData);
           items.push(
             ...vehiclesData.map((v: any) => {
               // Parse chassis numbers from comma-separated string
@@ -80,10 +83,14 @@ export default function InventoryDispatch() {
                 motorNo: v.motor_no,
                 batteryNo: v.battery_no,
                 batteryModel: v.battery_model,
+                manufacturerInvNo: v.manufacturer_inv_no,
+                salesCount: v.sales_count,
                 chassisNos: chassisNos,
               };
             })
           );
+        } else if (vehiclesError) {
+          console.error("Error fetching vehicles:", vehiclesError);
         }
 
         // Fetch spares inventory

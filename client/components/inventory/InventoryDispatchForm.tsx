@@ -3,21 +3,24 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, ChevronDown } from "lucide-react";
 import { fetchDMSDealers, DMSDealer } from "@/lib/dealers";
-import { supabase } from "@/lib/supabase";
 
 interface DetailedInventoryItem {
   id: string;
-  modelNo: string;
-  brand: string;
-  vehicleModel: string;
-  hsnNo: string;
-  vehicleCount: number;
-  closingStock: number;
-  motorNo: string;
-  batteryNo: string;
-  batteryModel: string;
-  chassisNos: string[];
+  modelNo?: string;
+  brand?: string;
+  vehicleModel?: string;
+  hsnNo?: string;
+  vehicleCount?: number;
+  closingStock?: number;
+  motorNo?: string;
+  batteryNo?: string;
+  batteryModel?: string;
+  manufacturerInvNo?: string;
+  salesCount?: number;
+  chassisNos?: string[];
   partName?: string;
+  price?: number;
+  qty?: number;
 }
 
 interface SelectedVehicle {
@@ -60,6 +63,10 @@ export default function InventoryDispatchForm({
   useEffect(() => {
     loadDealers();
   }, []);
+
+  useEffect(() => {
+    console.log("Inventory items in form:", inventoryItems);
+  }, [inventoryItems]);
 
   const loadDealers = async () => {
     setIsLoadingDealers(true);
@@ -231,7 +238,7 @@ export default function InventoryDispatchForm({
           {/* Product Selection */}
           <div>
             <label htmlFor="productId" className="block text-sm font-medium mb-2">
-              Select Product *
+              Select Product * ({filteredProducts.length} available)
             </label>
             <select
               id="productId"
@@ -243,7 +250,7 @@ export default function InventoryDispatchForm({
               <option value="">-- Select a {formData.category === "vehicles" ? "vehicle" : "spare"} --</option>
               {filteredProducts.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.modelNo || item.partName} ({item.closingStock || 0} in stock)
+                  {item.modelNo || item.partName} | {item.brand} | {item.closingStock || 0} in stock
                 </option>
               ))}
             </select>
@@ -281,8 +288,32 @@ export default function InventoryDispatchForm({
           {isVehicleCategory && selectedProduct && (
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-2">
-                Select Vehicles to Dispatch * ({selectedVehicles.length} selected)
+                Select Unsold Vehicles to Dispatch * ({selectedVehicles.length} selected of {selectedProduct.closingStock || 0} available)
               </label>
+              
+              {/* Product Details Header */}
+              <div className="mb-4 p-4 bg-muted rounded-lg border border-border">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground font-semibold">Model</p>
+                    <p>{selectedProduct.modelNo}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-semibold">Brand</p>
+                    <p>{selectedProduct.brand}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-semibold">Vehicle Model</p>
+                    <p>{selectedProduct.vehicleModel || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-semibold">HSN No</p>
+                    <p className="text-xs font-mono">{selectedProduct.hsnNo || "-"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle List */}
               <div className="border border-border rounded-lg overflow-hidden">
                 <button
                   type="button"
@@ -292,7 +323,7 @@ export default function InventoryDispatchForm({
                   <span>
                     {selectedVehicles.length > 0
                       ? `${selectedVehicles.length} vehicle(s) selected`
-                      : "Click to select vehicles"}
+                      : `Click to select from ${selectedProduct.closingStock || 0} unsold vehicles`}
                   </span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${
@@ -302,14 +333,14 @@ export default function InventoryDispatchForm({
                 </button>
 
                 {showVehicleList && (
-                  <div className="max-h-80 overflow-y-auto border-t border-border">
+                  <div className="max-h-96 overflow-y-auto border-t border-border bg-background">
                     {selectedProduct.chassisNos && selectedProduct.chassisNos.length > 0 ? (
-                      <div className="space-y-2 p-4">
+                      <div className="p-4 space-y-3">
                         {selectedProduct.chassisNos.map((chassis, idx) => {
                           const vehicle = {
                             chassisNo: chassis,
-                            motorNo: selectedProduct.motorNo || `MTR-${idx}`,
-                            batteryNo: selectedProduct.batteryNo || `BAT-${idx}`,
+                            motorNo: selectedProduct.motorNo || `MTR-${idx + 1}`,
+                            batteryNo: selectedProduct.batteryNo || `BAT-${idx + 1}`,
                           };
                           const isSelected = selectedVehicles.some(
                             (v) =>
@@ -319,7 +350,11 @@ export default function InventoryDispatchForm({
                           return (
                             <label
                               key={idx}
-                              className="flex items-start gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
+                              className={`flex items-start gap-3 p-3 rounded border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-blue-50 dark:bg-blue-950/20 border-blue-300 dark:border-blue-700"
+                                  : "bg-background border-border hover:bg-muted/50"
+                              }`}
                             >
                               <input
                                 type="checkbox"
@@ -327,23 +362,33 @@ export default function InventoryDispatchForm({
                                 onChange={() => toggleVehicleSelection(vehicle)}
                                 className="mt-1"
                               />
-                              <div className="flex-1 text-sm">
-                                <p className="font-medium">{chassis}</p>
-                                <div className="text-xs text-muted-foreground space-y-1 mt-1">
-                                  <p>
-                                    <span className="font-semibold">Motor:</span> {vehicle.motorNo}
-                                  </p>
-                                  <p>
-                                    <span className="font-semibold">Battery:</span>{" "}
-                                    {vehicle.batteryNo}
-                                  </p>
+                              <div className="flex-1 text-sm space-y-2">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground">Chassis</p>
+                                    <p className="font-mono text-xs">{chassis}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground">Motor</p>
+                                    <p className="font-mono text-xs">{vehicle.motorNo}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground">Battery</p>
+                                    <p className="font-mono text-xs">{vehicle.batteryNo}</p>
+                                  </div>
                                   {selectedProduct.batteryModel && (
-                                    <p>
-                                      <span className="font-semibold">Model:</span>{" "}
-                                      {selectedProduct.batteryModel}
-                                    </p>
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground">Battery Model</p>
+                                      <p className="text-xs">{selectedProduct.batteryModel}</p>
+                                    </div>
                                   )}
                                 </div>
+                                {selectedProduct.manufacturerInvNo && (
+                                  <div className="pt-1">
+                                    <p className="text-xs font-semibold text-muted-foreground">Manufacturer Inv No</p>
+                                    <p className="font-mono text-xs">{selectedProduct.manufacturerInvNo}</p>
+                                  </div>
+                                )}
                               </div>
                             </label>
                           );
@@ -359,16 +404,16 @@ export default function InventoryDispatchForm({
               </div>
 
               {selectedVehicles.length > 0 && (
-                <div className="mt-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
-                  <h4 className="font-semibold text-sm mb-2 text-blue-900 dark:text-blue-100">
-                    Selected Vehicles:
+                <div className="mt-4 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
+                  <h4 className="font-semibold text-sm mb-2 text-green-900 dark:text-green-100">
+                    Selected Vehicles ({selectedVehicles.length}):
                   </h4>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {selectedVehicles.map((v, idx) => (
-                      <div key={idx} className="text-xs text-blue-800 dark:text-blue-200">
-                        <span className="font-mono">{v.chassisNo}</span> | Motor:{" "}
-                        <span className="font-mono">{v.motorNo}</span> | Battery:{" "}
-                        <span className="font-mono">{v.batteryNo}</span>
+                      <div key={idx} className="text-xs text-green-800 dark:text-green-200 p-2 bg-white dark:bg-green-950/40 rounded font-mono">
+                        <p><span className="font-semibold">Chassis:</span> {v.chassisNo}</p>
+                        <p><span className="font-semibold">Motor:</span> {v.motorNo}</p>
+                        <p><span className="font-semibold">Battery:</span> {v.batteryNo}</p>
                       </div>
                     ))}
                   </div>
@@ -392,6 +437,7 @@ export default function InventoryDispatchForm({
                   onChange={handleInputChange}
                   placeholder="Enter quantity"
                   min="1"
+                  max={selectedProduct.closingStock}
                   className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 {selectedProduct && (
