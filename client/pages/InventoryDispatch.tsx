@@ -48,11 +48,10 @@ export default function InventoryDispatch() {
       const items: InventoryItem[] = [];
 
       if (supabase) {
-        // Fetch vehicles inventory
+        // Fetch vehicles inventory (all vehicles, not filtered by closing_stock)
         const { data: vehiclesData, error: vehiclesError } = await supabase
           .from("inventory_items")
-          .select("id, model_no, brand, vehicle_count, closing_stock")
-          .gt("closing_stock", 0);
+          .select("id, model_no, brand, vehicle_count, closing_stock");
 
         if (!vehiclesError && vehiclesData) {
           items.push(
