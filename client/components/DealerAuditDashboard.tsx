@@ -18,13 +18,11 @@ interface Dealer {
 export function DealerAuditDashboard() {
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
   const [dealersList, setDealersList] = useState<Dealer[]>([]);
-  const [dealersLoading, setDealersLoading] = useState(true);
   const { dealers: hookDealers, inventory, sales, services, loading } = useLiveDealerNetwork(selectedDealerId);
 
   // Fetch dealers independently to ensure they're always available
   useEffect(() => {
     async function loadDealers() {
-      setDealersLoading(true);
       try {
         const data = await fetchDMSDealers();
         console.log('DealerAuditDashboard - Loaded dealers:', data?.length, data);
@@ -32,8 +30,6 @@ export function DealerAuditDashboard() {
       } catch (error) {
         console.error('Error loading dealers in DealerAuditDashboard:', error);
         setDealersList([]);
-      } finally {
-        setDealersLoading(false);
       }
     }
     loadDealers();
@@ -57,11 +53,7 @@ export function DealerAuditDashboard() {
           <CardTitle>Select Dealer</CardTitle>
         </CardHeader>
         <CardContent>
-          {dealersLoading ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <p>Loading dealers...</p>
-            </div>
-          ) : dealers.length === 0 ? (
+          {dealers.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
               <p>No dealers found. Please add dealers first in the "Manage Dealers" tab.</p>
             </div>
