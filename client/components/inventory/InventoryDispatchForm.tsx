@@ -27,6 +27,7 @@ interface SelectedVehicle {
   chassisNo: string;
   motorNo: string;
   batteryNo: string;
+  quantity?: number;
 }
 
 interface InventoryDispatchFormProps {
@@ -65,7 +66,35 @@ export default function InventoryDispatchForm({
   }, []);
 
   useEffect(() => {
-    console.log("Inventory items in form:", inventoryItems);
+    // Updated filter logic: vehicles are identified by having chassis/motor/battery info
+    const vehicleItems = inventoryItems.filter((item) => {
+      return !item.partName && (
+        (item.chassisNos && item.chassisNos.length > 0) ||
+        item.motorNo ||
+        item.batteryNo ||
+        item.vehicleCount ||
+        item.motorNo !== undefined
+      );
+    });
+
+    const spareItems = inventoryItems.filter(i => i.partName);
+    const otherItems = inventoryItems.filter(i => !i.partName && vehicleItems.indexOf(i) === -1);
+
+    console.log(`%c📦 Inventory items in dispatch form`, "color: blue; font-weight: bold;");
+    console.log(`Total: ${inventoryItems.length} | Vehicles: ${vehicleItems.length} | Spares: ${spareItems.length} | Other: ${otherItems.length}`);
+
+    if (vehicleItems.length > 0) {
+      console.log("%cVehicle options available for dispatch:", "color: green; font-weight: bold;");
+      vehicleItems.forEach(v => {
+        const label = v.modelNo || v.brand || "Unknown";
+        console.log(`  ✓ ${label} - Stock: ${v.closingStock}, Chassis: ${v.chassisNos?.length || 0}`);
+      });
+    } else {
+      console.warn("%c⚠️ No vehicles to display in form!", "color: red; font-weight: bold;");
+      if (inventoryItems.length > 0) {
+        console.log("Raw inventory items:", inventoryItems);
+      }
+    }
   }, [inventoryItems]);
 
   const loadDealers = async () => {
@@ -83,10 +112,25 @@ export default function InventoryDispatchForm({
 
   const filteredProducts = inventoryItems.filter((item) => {
     if (formData.category === "vehicles") {
-      return item.modelNo && !item.partName;
+      // A vehicle is identified by having vehicle-related data, regardless of modelNo
+      // Check if it has chassis numbers OR motor/battery info OR vehicle count
+      const isVehicle = !item.partName && (
+        (item.chassisNos && item.chassisNos.length > 0) ||
+        item.motorNo ||
+        item.batteryNo ||
+        item.vehicleCount ||
+        item.motorNo !== undefined
+      );
+      return isVehicle;
     } else {
-      return item.partName && !item.modelNo;
+      // A spare is identified by having a partName
+      return item.partName;
     }
+  }).sort((a, b) => {
+    // Sort by model number, then by brand for consistency
+    const modelA = (a.modelNo || a.brand || "").toLowerCase();
+    const modelB = (b.modelNo || b.brand || "").toLowerCase();
+    return modelA.localeCompare(modelB);
   });
 
   const selectedProduct = filteredProducts.find(
@@ -120,8 +164,17 @@ export default function InventoryDispatchForm({
           (v) => !(v.chassisNo === vehicle.chassisNo && v.motorNo === vehicle.motorNo)
         );
       } else {
-        return [...prev, vehicle];
+        return [...prev, { ...vehicle, quantity: vehicle.quantity || 1 }];
       }
+    });
+  };
+
+  const updateVehicleQuantity = (index: number, quantity: number) => {
+    if (quantity < 1) return;
+    setSelectedVehicles((prev) => {
+      const updated = [...prev];
+      updated[index].quantity = quantity;
+      return updated;
     });
   };
 
@@ -157,13 +210,15 @@ export default function InventoryDispatchForm({
     setIsLoading(true);
     try {
       if (formData.category === "vehicles") {
-        // Dispatch each selected vehicle individually
+        // Dispatch each selected vehicle with its quantity
         for (const vehicle of selectedVehicles) {
+          const qty = vehicle.quantity || 1;
+          const productLabel = selectedProduct?.modelNo || selectedProduct?.brand || "Vehicle";
           const success = await onDispatch({
-            sku: selectedProduct?.modelNo || "N/A",
-            productName: selectedProduct?.modelNo || "Unknown Product",
+            sku: selectedProduct?.modelNo || selectedProduct?.brand || "N/A",
+            productName: productLabel,
             category: "vehicles",
-            quantity: 1,
+            quantity: qty,
             dealerId: formData.dealerId,
             chassisNo: vehicle.chassisNo,
             motorNo: vehicle.motorNo,
@@ -176,7 +231,8 @@ export default function InventoryDispatchForm({
             return;
           }
         }
-        toast.success(`${selectedVehicles.length} vehicle(s) dispatched successfully`);
+        const totalQty = selectedVehicles.reduce((sum, v) => sum + (v.quantity || 1), 0);
+        toast.success(`${totalQty} vehicle(s) from ${selectedVehicles.length} line(s) dispatched successfully`);
       } else {
         // Spares dispatch
         const success = await onDispatch({
@@ -294,22 +350,30 @@ export default function InventoryDispatchForm({
               {/* Product Details Header */}
               <div className="mb-4 p-4 bg-muted rounded-lg border border-border">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground font-semibold">Model</p>
-                    <p>{selectedProduct.modelNo}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground font-semibold">Brand</p>
-                    <p>{selectedProduct.brand}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground font-semibold">Vehicle Model</p>
-                    <p>{selectedProduct.vehicleModel || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground font-semibold">HSN No</p>
-                    <p className="text-xs font-mono">{selectedProduct.hsnNo || "-"}</p>
-                  </div>
+                  {selectedProduct.modelNo && (
+                    <div>
+                      <p className="text-muted-foreground font-semibold">Model</p>
+                      <p>{selectedProduct.modelNo}</p>
+                    </div>
+                  )}
+                  {selectedProduct.brand && (
+                    <div>
+                      <p className="text-muted-foreground font-semibold">Brand</p>
+                      <p>{selectedProduct.brand}</p>
+                    </div>
+                  )}
+                  {selectedProduct.vehicleModel && (
+                    <div>
+                      <p className="text-muted-foreground font-semibold">Vehicle Model</p>
+                      <p>{selectedProduct.vehicleModel}</p>
+                    </div>
+                  )}
+                  {selectedProduct.hsnNo && (
+                    <div>
+                      <p className="text-muted-foreground font-semibold">HSN No</p>
+                      <p className="text-xs font-mono">{selectedProduct.hsnNo}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -408,12 +472,24 @@ export default function InventoryDispatchForm({
                   <h4 className="font-semibold text-sm mb-2 text-green-900 dark:text-green-100">
                     Selected Vehicles ({selectedVehicles.length}):
                   </h4>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {selectedVehicles.map((v, idx) => (
-                      <div key={idx} className="text-xs text-green-800 dark:text-green-200 p-2 bg-white dark:bg-green-950/40 rounded font-mono">
-                        <p><span className="font-semibold">Chassis:</span> {v.chassisNo}</p>
-                        <p><span className="font-semibold">Motor:</span> {v.motorNo}</p>
-                        <p><span className="font-semibold">Battery:</span> {v.batteryNo}</p>
+                      <div key={idx} className="text-xs text-green-800 dark:text-green-200 p-3 bg-white dark:bg-green-950/40 rounded">
+                        <div className="font-mono space-y-1 mb-2">
+                          <p><span className="font-semibold">Chassis:</span> {v.chassisNo}</p>
+                          <p><span className="font-semibold">Motor:</span> {v.motorNo}</p>
+                          <p><span className="font-semibold">Battery:</span> {v.batteryNo}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="font-semibold text-xs">Qty to dispatch:</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={v.quantity || 1}
+                            onChange={(e) => updateVehicleQuantity(idx, parseInt(e.target.value) || 1)}
+                            className="w-16 px-2 py-1 border border-green-300 dark:border-green-700 rounded text-xs font-medium bg-white dark:bg-green-950/60 text-green-900 dark:text-green-100"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -466,7 +542,9 @@ export default function InventoryDispatchForm({
               <div>
                 <p className="text-muted-foreground">Quantity</p>
                 <p className="font-medium">
-                  {isVehicleCategory ? selectedVehicles.length : formData.quantity} units
+                  {isVehicleCategory
+                    ? selectedVehicles.reduce((sum, v) => sum + (v.quantity || 1), 0)
+                    : formData.quantity} units
                 </p>
               </div>
               <div>

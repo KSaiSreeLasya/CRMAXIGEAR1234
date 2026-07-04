@@ -56,62 +56,125 @@ export default function InventoryDispatch() {
       const items: InventoryItem[] = [];
 
       if (supabase) {
-        // Fetch vehicles inventory (all vehicles, not filtered by closing_stock)
-        const { data: vehiclesData, error: vehiclesError } = await supabase
-          .from("inventory_items")
-          .select("id, model_no, brand, vehicle_model, hsn_no, vehicle_count, closing_stock, motor_no, battery_no, battery_model, chassis_no, manufacturer_inv_no, sales_count");
+        try {
+          // Fetch ALL vehicles inventory (including those already partially/fully dispatched)
+          const { data: vehiclesData, error: vehiclesError } = await supabase
+            .from("inventory_items")
+            .select("*")
+            .order("model_no", { ascending: true });
 
-        if (!vehiclesError && vehiclesData) {
-          console.log(`Loaded ${vehiclesData.length} vehicles from database`, vehiclesData);
-          items.push(
-            ...vehiclesData.map((v: any) => {
-              // Parse chassis numbers from comma-separated string
-              const chassisString = v.chassis_no || "";
-              const chassisNos = chassisString
-                .split(",")
-                .map((c: string) => c.trim())
-                .filter((c: string) => c.length > 0);
+          if (!vehiclesError && vehiclesData) {
+            console.log(`%c✓ Loaded ${vehiclesData.length} vehicles from database`, "color: green;");
 
-              return {
+            // Log vehicles with missing model_no
+            const missingModelNo = vehiclesData.filter((v: any) => !v.model_no);
+            if (missingModelNo.length > 0) {
+              console.warn(`⚠️ ${missingModelNo.length} vehicles missing model_no:`, missingModelNo);
+            }
+
+            if (vehiclesData.length > 0) {
+              console.log("Sample vehicle data:", vehiclesData[0]);
+            }
+            items.push(
+              ...vehiclesData.map((v: any) => {
+                // Parse chassis numbers from comma-separated string
+                const chassisString = v.chassis_no || "";
+                const chassisNos = chassisString
+                  .split(",")
+                  .map((c: string) => c.trim())
+                  .filter((c: string) => c.length > 0);
+
+                return {
+                  id: v.id,
+                  modelNo: v.model_no,
+                  brand: v.brand,
+                  vehicleModel: v.vehicle_model,
+                  hsnNo: v.hsn_no,
+                  vehicleCount: v.vehicle_count,
+                  closingStock: v.closing_stock,
+                  motorNo: v.motor_no,
+                  batteryNo: v.battery_no,
+                  batteryModel: v.battery_model,
+                  manufacturerInvNo: v.manufacturer_inv_no,
+                  salesCount: v.sales_count,
+                  chassisNos: chassisNos,
+                };
+              })
+            );
+          } else if (vehiclesError) {
+            console.error("Error fetching vehicles:", vehiclesError);
+            throw vehiclesError;
+          }
+        } catch (supabaseError) {
+          console.error("Supabase error loading vehicles:", supabaseError);
+          // Fall back to localStorage if Supabase fails
+          const raw = localStorage.getItem("crm_inventory_items");
+          if (raw) {
+            const localItems = JSON.parse(raw);
+            items.push(
+              ...localItems.map((v: any) => ({
                 id: v.id,
-                modelNo: v.model_no,
+                modelNo: v.modelNo,
                 brand: v.brand,
-                vehicleModel: v.vehicle_model,
-                hsnNo: v.hsn_no,
-                vehicleCount: v.vehicle_count,
-                closingStock: v.closing_stock,
-                motorNo: v.motor_no,
-                batteryNo: v.battery_no,
-                batteryModel: v.battery_model,
-                manufacturerInvNo: v.manufacturer_inv_no,
-                salesCount: v.sales_count,
-                chassisNos: chassisNos,
-              };
-            })
-          );
-        } else if (vehiclesError) {
-          console.error("Error fetching vehicles:", vehiclesError);
+                vehicleModel: v.vehicleModel,
+                hsnNo: v.hsnNo,
+                vehicleCount: v.vehicleCount,
+                closingStock: v.closingStock,
+                motorNo: v.motorNo,
+                batteryNo: v.batteryNo,
+                batteryModel: v.batteryModel,
+                manufacturerInvNo: v.manufacturerInvNo,
+                salesCount: v.salesCount,
+                chassisNos: v.chassisNo ? v.chassisNo.split(",").map((c: string) => c.trim()).filter((c: string) => c) : [],
+              }))
+            );
+          }
         }
 
         // Fetch spares inventory
-        const { data: sparesData, error: sparesError } = await supabase
-          .from("spares_inventory")
-          .select("id, part_name, price, qty");
+        try {
+          const { data: sparesData, error: sparesError } = await supabase
+            .from("spares_inventory")
+            .select("id, part_name, price, qty");
 
-        if (!sparesError && sparesData) {
-          items.push(
-            ...sparesData.map((s: any) => ({
-              id: s.id,
-              partName: s.part_name,
-              price: s.price,
-              qty: s.qty,
-              closingStock: s.qty,
-            }))
-          );
+          if (!sparesError && sparesData) {
+            items.push(
+              ...sparesData.map((s: any) => ({
+                id: s.id,
+                partName: s.part_name,
+                price: s.price,
+                qty: s.qty,
+                closingStock: s.qty,
+              }))
+            );
+          } else if (sparesError) {
+            console.error("Error fetching spares:", sparesError);
+          }
+        } catch (spareError) {
+          console.error("Error loading spares:", spareError);
         }
       }
 
       setInventoryItems(items);
+      const vehicleItems = items.filter(i => i.modelNo);
+      const spareItems = items.filter(i => i.partName);
+
+      console.log(`%c✓ Inventory Dispatch Data Loaded`, "color: green; font-weight: bold; font-size: 14px;");
+      console.table({
+        'Total Items': items.length,
+        'Vehicles': vehicleItems.length,
+        'Spares': spareItems.length,
+      });
+
+      if (vehicleItems.length > 0) {
+        console.log(`%cVehicle Models Available:`, "color: blue; font-weight: bold;");
+        vehicleItems.forEach(v => {
+          console.log(`  • ${v.modelNo} (${v.brand}) - Chassis: ${v.chassisNos?.join(', ') || 'none'}`);
+        });
+      } else {
+        console.error("%c⚠️ WARNING: No vehicle items loaded!", "color: red; font-weight: bold;");
+        console.log("Items array content:", items);
+      }
 
       // Load dealers
       const dealersData = await fetchDMSDealers();
