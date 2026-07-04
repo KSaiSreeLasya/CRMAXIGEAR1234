@@ -65,6 +65,13 @@ export default function InventoryDispatch() {
 
           if (!vehiclesError && vehiclesData) {
             console.log(`%c✓ Loaded ${vehiclesData.length} vehicles from database`, "color: green;");
+
+            // Log vehicles with missing model_no
+            const missingModelNo = vehiclesData.filter((v: any) => !v.model_no);
+            if (missingModelNo.length > 0) {
+              console.warn(`⚠️ ${missingModelNo.length} vehicles missing model_no:`, missingModelNo);
+            }
+
             if (vehiclesData.length > 0) {
               console.log("Sample vehicle data:", vehiclesData[0]);
             }

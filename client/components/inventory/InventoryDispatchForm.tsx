@@ -73,6 +73,10 @@ export default function InventoryDispatchForm({
     console.log(`%c📦 Inventory items in dispatch form`, "color: blue; font-weight: bold;");
     console.log(`Total: ${inventoryItems.length} | Vehicles: ${vehicleItems.length} | Spares: ${spareItems.length} | Other: ${withoutModelNoOrPartName.length}`);
 
+    if (withoutModelNoOrPartName.length > 0) {
+      console.warn("%c⚠️ Items without modelNo or partName:", "color: orange;", withoutModelNoOrPartName);
+    }
+
     if (vehicleItems.length > 0) {
       console.log("Vehicle options available for dispatch:");
       vehicleItems.forEach(v => {
