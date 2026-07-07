@@ -136,13 +136,16 @@ export default function DealersProductInvoice() {
   useEffect(() => {
     void loadInvoices();
     void loadDealers();
-    if (!editingId) {
+  }, []);
+
+  useEffect(() => {
+    if (!editingId && form.invoice_number === "") {
       setForm((prev) => ({
         ...prev,
         invoice_number: getNextInvoiceNumber(),
       }));
     }
-  }, [editingId]);
+  }, [editingId, form.invoice_number]);
 
   const loadInvoices = async () => {
     setIsLoading(true);

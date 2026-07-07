@@ -134,14 +134,18 @@ export default function ServiceInvoice() {
   useEffect(() => {
     void loadInvoices();
     void loadSpares();
-    // Auto-set invoice number when not editing
-    if (!editingId) {
+  }, []);
+
+  // Auto-set invoice number only when creating a new invoice (form is reset)
+  // When editing an existing invoice, handleEdit() sets serviceInvoiceNo, so this won't trigger
+  useEffect(() => {
+    if (!editingId && form.serviceInvoiceNo === "") {
       setForm((prev) => ({
         ...prev,
         serviceInvoiceNo: getNextServiceInvoiceNumber(),
       }));
     }
-  }, [editingId]);
+  }, [editingId, form.serviceInvoiceNo]);
 
   const loadInvoices = async () => {
     setIsLoading(true);

@@ -204,19 +204,25 @@ export default function DealerInvoice() {
     void loadInvoices();
     void loadSparesInvoices();
     void loadDealers();
-    if (!editingId) {
+  }, []);
+
+  useEffect(() => {
+    if (!editingId && form.dealerInvoiceNo === "") {
       setForm((prev) => ({
         ...prev,
         dealerInvoiceNo: getNextDealerInvoiceNumber(),
       }));
     }
-    if (!editingSparesId) {
+  }, [editingId, form.dealerInvoiceNo]);
+
+  useEffect(() => {
+    if (!editingSparesId && sparesForm.dealerInvoiceNo === "") {
       setSparesForm((prev) => ({
         ...prev,
         dealerInvoiceNo: getNextSparesInvoiceNumber(),
       }));
     }
-  }, [editingId, editingSparesId]);
+  }, [editingSparesId, sparesForm.dealerInvoiceNo]);
 
 const loadInvoices = async () => {
   setIsLoading(true);
