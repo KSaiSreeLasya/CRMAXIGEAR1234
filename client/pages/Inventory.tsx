@@ -10,6 +10,12 @@ import { SpareImportExport } from "@/components/SpareImportExport";
 import { ImportExport } from "@/components/ImportExport";
 import { IncomingDealerShipments } from "@/components/inventory/IncomingDealerShipments";
 
+interface ChassisPair {
+  chassis_no: string;
+  motor_no: string;
+  battery_no: string;
+}
+
 interface InventoryItem {
   id: string;
   slNo: number;
@@ -18,20 +24,17 @@ interface InventoryItem {
   vehicleModel: string;
   hsnNo: string;
   vehicleCount: number;
-  chassisNo: string;
+  chassisMotorBattery: ChassisPair[];
   previousChassisNo: string;
-  motorNo: string;
-  batteryNo: string;
   manufacturerInvNo: string;
   batteryModel: string;
   batteryCount: number;
-  salesCount: number;
   closingStock: number;
   createdAt: string;
 }
 
 interface ChassisInputState {
-  inputs: string[];
+  pairs: ChassisPair[];
 }
 
 interface SpareItem {
@@ -51,13 +54,9 @@ const DEFAULT_FORM = {
   vehicleModel: "",
   hsnNo: "",
   vehicleCount: "",
-  chassisNo: "",
-  motorNo: "",
-  batteryNo: "",
   manufacturerInvNo: "",
   batteryModel: "",
   batteryCount: "",
-  salesCount: "",
 };
 
 const DEFAULT_SPARE_FORM = {
@@ -71,7 +70,7 @@ export default function Inventory() {
   const navigate = useNavigate();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [chassisInputs, setChassisInputs] = useState<ChassisInputState>({ inputs: [""] });
+  const [chassisInputs, setChassisInputs] = useState<ChassisInputState>({ pairs: [{ chassis_no: "", motor_no: "", battery_no: "" }] });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -117,15 +116,12 @@ export default function Inventory() {
               vehicleModel: row.vehicle_model || "",
               hsnNo: row.hsn_no || "",
               vehicleCount: row.vehicle_count || 0,
-              chassisNo: row.chassis_no || "",
+              chassisMotorBattery: row.chassis_motor_battery || [],
               previousChassisNo: row.previous_chassis_no || "",
-              motorNo: row.motor_no || "",
-              batteryNo: row.battery_no || "",
               manufacturerInvNo: row.manufacturer_inv_no || "",
               batteryModel: row.battery_model || "",
               batteryCount: row.battery_count || 0,
-              salesCount: row.sales_count || 0,
-              closingStock: row.closing_stock || 0,
+              closingStock: row.vehicle_count || 0,
               createdAt: new Date(row.created_at).toLocaleDateString(),
             })) || [];
           setItems(rows);
@@ -215,14 +211,16 @@ export default function Inventory() {
     try {
       const vehicleCount = Number(form.vehicleCount || 0);
       const batteryCount = Number(form.batteryCount || 0);
-      const salesCount = Number(form.salesCount || 0);
-      const closingStock = vehicleCount - salesCount;
+      const closingStock = vehicleCount;
 
-      // Build chassis string from individual inputs
-      const chassisString = chassisInputs.inputs
-        .map((c) => c.trim())
-        .filter((c) => c)
-        .join(", ");
+      // Filter out empty pairs and trim values
+      const chassisMotorBatteryPairs = chassisInputs.pairs
+        .filter((pair) => pair.chassis_no.trim() || pair.motor_no.trim() || pair.battery_no.trim())
+        .map((pair) => ({
+          chassis_no: pair.chassis_no.trim(),
+          motor_no: pair.motor_no.trim(),
+          battery_no: pair.battery_no.trim(),
+        }));
 
       const payload = {
         slNo: Number(form.slNo || 0),
@@ -231,13 +229,10 @@ export default function Inventory() {
         vehicleModel: form.vehicleModel.trim(),
         hsnNo: form.hsnNo.trim(),
         vehicleCount,
-        chassisNo: chassisString,
-        motorNo: form.motorNo.trim(),
-        batteryNo: form.batteryNo.trim(),
+        chassisMotorBattery: chassisMotorBatteryPairs,
         manufacturerInvNo: form.manufacturerInvNo.trim(),
         batteryModel: form.batteryModel.trim(),
         batteryCount,
-        salesCount,
         closingStock,
       };
 
@@ -252,13 +247,10 @@ export default function Inventory() {
               vehicle_model: payload.vehicleModel || null,
               hsn_no: payload.hsnNo || null,
               vehicle_count: payload.vehicleCount,
-              chassis_no: payload.chassisNo || null,
-              motor_no: payload.motorNo || null,
-              battery_no: payload.batteryNo || null,
+              chassis_motor_battery: payload.chassisMotorBattery || [],
               manufacturer_inv_no: payload.manufacturerInvNo || null,
               battery_model: payload.batteryModel || null,
               battery_count: payload.batteryCount,
-              sales_count: payload.salesCount,
               closing_stock: payload.closingStock,
             })
             .eq("id", editingId);
@@ -300,13 +292,10 @@ export default function Inventory() {
                   vehicle_model: payload.vehicleModel || null,
                   hsn_no: payload.hsnNo || null,
                   vehicle_count: payload.vehicleCount,
-                  chassis_no: payload.chassisNo || null,
-                  motor_no: payload.motorNo || null,
-                  battery_no: payload.batteryNo || null,
+                  chassis_motor_battery: payload.chassisMotorBattery || [],
                   manufacturer_inv_no: payload.manufacturerInvNo || null,
                   battery_model: payload.batteryModel || null,
                   battery_count: payload.batteryCount,
-                  sales_count: payload.salesCount,
                   closing_stock: payload.closingStock,
                 },
               ])
@@ -322,15 +311,12 @@ export default function Inventory() {
             vehicleModel: data.vehicle_model || "",
             hsnNo: data.hsn_no || "",
             vehicleCount: data.vehicle_count || 0,
-            chassisNo: data.chassis_no || "",
+            chassisMotorBattery: data.chassis_motor_battery || [],
             previousChassisNo: data.previous_chassis_no || "",
-            motorNo: data.motor_no || "",
-            batteryNo: data.battery_no || "",
             manufacturerInvNo: data.manufacturer_inv_no || "",
             batteryModel: data.battery_model || "",
             batteryCount: data.battery_count || 0,
-            salesCount: data.sales_count || 0,
-            closingStock: data.closing_stock || 0,
+            closingStock: data.vehicle_count || 0,
             createdAt: new Date(data.created_at).toLocaleDateString(),
           };
           setItems((prev) => [...prev, created].sort((a, b) => a.slNo - b.slNo));
@@ -339,8 +325,18 @@ export default function Inventory() {
             const created: InventoryItem = {
               id: `inventory_${Date.now()}`,
               createdAt: new Date().toLocaleDateString(),
-              ...payload,
+              slNo: payload.slNo,
+              modelNo: payload.modelNo,
+              brand: payload.brand,
+              vehicleModel: payload.vehicleModel,
+              hsnNo: payload.hsnNo,
+              vehicleCount: payload.vehicleCount,
+              chassisMotorBattery: payload.chassisMotorBattery,
               previousChassisNo: "",
+              manufacturerInvNo: payload.manufacturerInvNo,
+              batteryModel: payload.batteryModel,
+              batteryCount: payload.batteryCount,
+              closingStock: payload.closingStock,
             };
             persistLocal([...items, created].sort((a, b) => a.slNo - b.slNo));
           }
@@ -348,7 +344,18 @@ export default function Inventory() {
           const created: InventoryItem = {
             id: `inventory_${Date.now()}`,
             createdAt: new Date().toLocaleDateString(),
-            ...payload,
+            slNo: payload.slNo,
+            modelNo: payload.modelNo,
+            brand: payload.brand,
+            vehicleModel: payload.vehicleModel,
+            hsnNo: payload.hsnNo,
+            vehicleCount: payload.vehicleCount,
+            chassisMotorBattery: payload.chassisMotorBattery,
+            previousChassisNo: "",
+            manufacturerInvNo: payload.manufacturerInvNo,
+            batteryModel: payload.batteryModel,
+            batteryCount: payload.batteryCount,
+            closingStock: payload.closingStock,
           };
           persistLocal([...items, created].sort((a, b) => a.slNo - b.slNo));
         }
@@ -387,43 +394,41 @@ export default function Inventory() {
       vehicleModel: item.vehicleModel,
       hsnNo: item.hsnNo,
       vehicleCount: String(item.vehicleCount),
-      chassisNo: item.chassisNo,
-      motorNo: item.motorNo,
-      batteryNo: item.batteryNo,
       manufacturerInvNo: item.manufacturerInvNo,
       batteryModel: item.batteryModel,
       batteryCount: String(item.batteryCount),
-      salesCount: String(item.salesCount),
     });
-    // Parse existing current chassis numbers into inputs array (not including sold/previous)
-    const chassis = item.chassisNo
-      ? item.chassisNo.split(",").map((c) => c.trim()).filter((c) => c)
-      : [""];
-    setChassisInputs({ inputs: chassis.length > 0 ? chassis : [""] });
+    // Load existing chassis/motor/battery pairs
+    const pairs = item.chassisMotorBattery && item.chassisMotorBattery.length > 0
+      ? item.chassisMotorBattery
+      : [{ chassis_no: "", motor_no: "", battery_no: "" }];
+    setChassisInputs({ pairs });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm(DEFAULT_FORM);
-    setChassisInputs({ inputs: [""] });
+    setChassisInputs({ pairs: [{ chassis_no: "", motor_no: "", battery_no: "" }] });
   };
 
-  const addChassisInput = () => {
+  const addChassisPair = () => {
     setChassisInputs((prev) => ({
-      inputs: [...prev.inputs, ""],
+      pairs: [...prev.pairs, { chassis_no: "", motor_no: "", battery_no: "" }],
     }));
   };
 
-  const removeChassisInput = (index: number) => {
+  const removeChassisPair = (index: number) => {
     setChassisInputs((prev) => ({
-      inputs: prev.inputs.filter((_, i) => i !== index),
+      pairs: prev.pairs.filter((_, i) => i !== index),
     }));
   };
 
-  const updateChassisInput = (index: number, value: string) => {
+  const updateChassisPair = (index: number, field: keyof ChassisPair, value: string) => {
     setChassisInputs((prev) => ({
-      inputs: prev.inputs.map((input, i) => (i === index ? value : input)),
+      pairs: prev.pairs.map((pair, i) =>
+        i === index ? { ...pair, [field]: value } : pair
+      ),
     }));
   };
 
@@ -692,9 +697,25 @@ export default function Inventory() {
       const newItems: InventoryItem[] = [];
       const itemsToInsert = importedItems.map((item, index) => {
         const vehicleCount = Number(item.vehicleCount || 0);
-        const salesCount = Number(item.salesCount || 0);
-        const closingStock = vehicleCount - salesCount;
+        const closingStock = vehicleCount;
         const continuousSlNo = maxSlNo + index + 1;
+
+        // Handle chassis_motor_battery - could be array or comma-separated string
+        let cmb: ChassisPair[] = [];
+        if (item.chassisMotorBattery) {
+          if (Array.isArray(item.chassisMotorBattery)) {
+            cmb = item.chassisMotorBattery;
+          } else if (typeof item.chassisMotorBattery === "string") {
+            // Try to parse as JSON array, otherwise treat as legacy format
+            try {
+              cmb = JSON.parse(item.chassisMotorBattery);
+            } catch {
+              // Fallback: if it's a simple comma-separated chassis list, create pairs
+              const chassis = item.chassisMotorBattery.split(",").map((c: string) => c.trim()).filter((c: string) => c);
+              cmb = chassis.map((c: string) => ({ chassis_no: c, motor_no: "", battery_no: "" }));
+            }
+          }
+        }
 
         return {
           user_id: userId,
@@ -704,13 +725,10 @@ export default function Inventory() {
           vehicle_model: item.vehicleModel || null,
           hsn_no: item.hsnNo || null,
           vehicle_count: vehicleCount,
-          chassis_no: item.chassisNo || null,
-          motor_no: item.motorNo || null,
-          battery_no: item.batteryNo || null,
+          chassis_motor_battery: cmb,
           manufacturer_inv_no: item.manufacturerInvNo || null,
           battery_model: item.batteryModel || null,
           battery_count: Number(item.batteryCount || 0),
-          sales_count: salesCount,
           closing_stock: closingStock,
         };
       });
@@ -733,15 +751,12 @@ export default function Inventory() {
               vehicleModel: row.vehicle_model || "",
               hsnNo: row.hsn_no || "",
               vehicleCount: row.vehicle_count || 0,
-              chassisNo: row.chassis_no || "",
+              chassisMotorBattery: row.chassis_motor_battery || [],
               previousChassisNo: row.previous_chassis_no || "",
-              motorNo: row.motor_no || "",
-              batteryNo: row.battery_no || "",
               manufacturerInvNo: row.manufacturer_inv_no || "",
               batteryModel: row.battery_model || "",
               batteryCount: row.battery_count || 0,
-              salesCount: row.sales_count || 0,
-              closingStock: row.closing_stock || 0,
+              closingStock: row.vehicle_count || 0,
               createdAt: new Date(row.created_at).toLocaleDateString(),
             });
           });
@@ -842,7 +857,7 @@ export default function Inventory() {
                 data={items}
                 onImport={handleImportInventory}
                 dataType="inventory"
-                exportHeaders={["slNo", "modelNo", "brand", "vehicleModel", "hsnNo", "vehicleCount", "chassisNo", "motorNo", "batteryNo", "manufacturerInvNo", "batteryModel", "batteryCount", "salesCount", "closingStock"]}
+                exportHeaders={["slNo", "modelNo", "brand", "vehicleModel", "hsnNo", "vehicleCount", "chassisMotorBattery", "manufacturerInvNo", "batteryModel", "batteryCount", "closingStock"]}
                 filename="inventory_items.csv"
                 title="Sales Vehicles Inventory"
               />
@@ -859,45 +874,59 @@ export default function Inventory() {
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="Vehicle Model" value={form.vehicleModel} onChange={(e) => setForm((prev) => ({ ...prev, vehicleModel: e.target.value }))} />
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="HSN No" value={form.hsnNo} onChange={(e) => setForm((prev) => ({ ...prev, hsnNo: e.target.value }))} />
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" type="number" placeholder="Vehicle Count" value={form.vehicleCount} onChange={(e) => setForm((prev) => ({ ...prev, vehicleCount: e.target.value }))} />
-                {/* Chassis No Manager */}
+                {/* Chassis/Motor/Battery Manager */}
                 <div className="md:col-span-3">
-                  <label className="block text-sm font-semibold mb-3">Chassis No</label>
-                  <div className="space-y-2">
-                    {chassisInputs.inputs.map((chassis, index) => (
-                      <div key={index} className="flex gap-2">
+                  <label className="block text-sm font-semibold mb-3">Chassis, Motor & Battery Numbers</label>
+                  <p className="text-xs text-muted-foreground mb-3">Each chassis number can have one motor number and one battery number. All fields are optional.</p>
+                  <div className="space-y-3">
+                    {chassisInputs.pairs.map((pair, index) => (
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 border border-border rounded-lg bg-muted/30">
                         <input
                           type="text"
-                          placeholder={`Chassis No ${index + 1}`}
-                          value={chassis}
-                          onChange={(e) => updateChassisInput(index, e.target.value)}
-                          className="flex-1 px-4 py-2 border border-border rounded-lg bg-background"
+                          placeholder="Chassis No"
+                          value={pair.chassis_no}
+                          onChange={(e) => updateChassisPair(index, "chassis_no", e.target.value)}
+                          className="px-4 py-2 border border-border rounded-lg bg-background"
                         />
-                        {chassisInputs.inputs.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeChassisInput(index)}
-                            className="px-3 py-2 border border-destructive rounded-lg text-destructive hover:bg-destructive/10 transition-colors font-semibold"
-                          >
-                            −
-                          </button>
-                        )}
+                        <input
+                          type="text"
+                          placeholder="Motor No"
+                          value={pair.motor_no}
+                          onChange={(e) => updateChassisPair(index, "motor_no", e.target.value)}
+                          className="px-4 py-2 border border-border rounded-lg bg-background"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Battery No"
+                            value={pair.battery_no}
+                            onChange={(e) => updateChassisPair(index, "battery_no", e.target.value)}
+                            className="flex-1 px-4 py-2 border border-border rounded-lg bg-background"
+                          />
+                          {chassisInputs.pairs.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeChassisPair(index)}
+                              className="px-3 py-2 border border-destructive rounded-lg text-destructive hover:bg-destructive/10 transition-colors font-semibold"
+                            >
+                              −
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                     <button
                       type="button"
-                      onClick={addChassisInput}
+                      onClick={addChassisPair}
                       className="px-4 py-2 border border-primary rounded-lg text-primary hover:bg-primary/10 transition-colors font-semibold"
                     >
-                      +
+                      + Add Another Set
                     </button>
                   </div>
                 </div>
-                <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="Motor No" value={form.motorNo} onChange={(e) => setForm((prev) => ({ ...prev, motorNo: e.target.value }))} />
-                <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="Battery No" value={form.batteryNo} onChange={(e) => setForm((prev) => ({ ...prev, batteryNo: e.target.value }))} />
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="Manufact. Inv No" value={form.manufacturerInvNo} onChange={(e) => setForm((prev) => ({ ...prev, manufacturerInvNo: e.target.value }))} />
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="Battery Model (e.g. 60V-30AH)" value={form.batteryModel} onChange={(e) => setForm((prev) => ({ ...prev, batteryModel: e.target.value }))} />
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" type="number" placeholder="Battery Count" value={form.batteryCount} onChange={(e) => setForm((prev) => ({ ...prev, batteryCount: e.target.value }))} />
-                <input className="px-4 py-2 border border-border rounded-lg bg-background" type="number" placeholder="Sales Count" value={form.salesCount} onChange={(e) => setForm((prev) => ({ ...prev, salesCount: e.target.value }))} />
                 <button
                   type="submit"
                   disabled={isSaving}
@@ -968,18 +997,10 @@ export default function Inventory() {
                         <th className="px-3 py-2 text-left">Vehicle Model</th>
                         <th className="px-3 py-2 text-left">HSN No</th>
                         <th className="px-3 py-2 text-left">Vehicle Count</th>
-                        {chassisFilter !== "previous" && (
-                          <th className="px-3 py-2 text-left">Current Chassis (Unsold)</th>
-                        )}
-                        {chassisFilter !== "current" && (
-                          <th className="px-3 py-2 text-left">Previous Chassis (Sold)</th>
-                        )}
-                        <th className="px-3 py-2 text-left">Motor No</th>
-                        <th className="px-3 py-2 text-left">Battery No</th>
+                        <th className="px-3 py-2 text-left">Chassis / Motor / Battery</th>
                         <th className="px-3 py-2 text-left">Manufact. Inv No</th>
                         <th className="px-3 py-2 text-left">Battery Model</th>
                         <th className="px-3 py-2 text-left">Battery Count</th>
-                        <th className="px-3 py-2 text-left">Sales Count</th>
                         <th className="px-3 py-2 text-left">Closing Stock</th>
                         <th className="px-3 py-2 text-left">Action</th>
                       </tr>
@@ -993,24 +1014,24 @@ export default function Inventory() {
                           <td className="px-3 py-2">{item.vehicleModel || "-"}</td>
                           <td className="px-3 py-2">{item.hsnNo || "-"}</td>
                           <td className="px-3 py-2">{item.vehicleCount}</td>
-                          {chassisFilter !== "previous" && (
-                            <td className="px-3 py-2 bg-blue-50 dark:bg-blue-950/20">
-                              <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">CURRENT:</span>
-                              <div className="text-sm">{item.chassisNo || "-"}</div>
-                            </td>
-                          )}
-                          {chassisFilter !== "current" && (
-                            <td className="px-3 py-2 bg-gray-50 dark:bg-gray-950/20">
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">SOLD:</span>
-                              <div className="text-sm">{item.previousChassisNo || "-"}</div>
-                            </td>
-                          )}
-                          <td className="px-3 py-2">{item.motorNo || "-"}</td>
-                          <td className="px-3 py-2">{item.batteryNo || "-"}</td>
+                          <td className="px-3 py-2">
+                            {item.chassisMotorBattery && item.chassisMotorBattery.length > 0 ? (
+                              <div className="space-y-1 text-xs">
+                                {item.chassisMotorBattery.map((pair, idx) => (
+                                  <div key={idx} className="border border-border rounded px-2 py-1">
+                                    {pair.chassis_no && <div><span className="font-semibold">C:</span> {pair.chassis_no}</div>}
+                                    {pair.motor_no && <div><span className="font-semibold">M:</span> {pair.motor_no}</div>}
+                                    {pair.battery_no && <div><span className="font-semibold">B:</span> {pair.battery_no}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
                           <td className="px-3 py-2">{item.manufacturerInvNo || "-"}</td>
                           <td className="px-3 py-2">{item.batteryModel || "-"}</td>
                           <td className="px-3 py-2">{item.batteryCount}</td>
-                          <td className="px-3 py-2 font-semibold">{item.salesCount}</td>
                           <td className="px-3 py-2 font-semibold text-green-600 dark:text-green-400">{item.closingStock}</td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-3">
