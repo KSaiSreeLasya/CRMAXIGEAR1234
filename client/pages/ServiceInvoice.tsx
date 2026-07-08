@@ -130,22 +130,25 @@ export default function ServiceInvoice() {
   const [isSaving, setIsSaving] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [gstType, setGstType] = useState<"igst" | "cgst-sgst">("cgst-sgst");
+  const [hasGeneratedNumber, setHasGeneratedNumber] = useState(false);
 
   useEffect(() => {
     void loadInvoices();
     void loadSpares();
   }, []);
 
-  // Auto-set invoice number only when creating a new invoice (form is reset)
-  // When editing an existing invoice, handleEdit() sets serviceInvoiceNo, so this won't trigger
   useEffect(() => {
-    if (!editingId && form.serviceInvoiceNo === "") {
+    if (!editingId && !hasGeneratedNumber && form.serviceInvoiceNo === "") {
       setForm((prev) => ({
         ...prev,
         serviceInvoiceNo: getNextServiceInvoiceNumber(),
       }));
+      setHasGeneratedNumber(true);
     }
-  }, [editingId, form.serviceInvoiceNo]);
+    if (editingId) {
+      setHasGeneratedNumber(true);
+    }
+  }, [editingId, hasGeneratedNumber]);
 
   const loadInvoices = async () => {
     setIsLoading(true);
@@ -466,6 +469,7 @@ export default function ServiceInvoice() {
 
       setForm(createDefaultForm());
       setEditingId(null);
+      setHasGeneratedNumber(false);
     } catch (error: any) {
       console.error("Error saving service invoice:", error);
       alert(error?.message || "Failed to save service invoice.");
@@ -536,6 +540,7 @@ export default function ServiceInvoice() {
     setEditingId(null);
     setForm(createDefaultForm());
     resetSplitPayments();
+    setHasGeneratedNumber(false);
   };
 
   const handleDownloadPDF = async (invoice: ServiceInvoiceRecord) => {
