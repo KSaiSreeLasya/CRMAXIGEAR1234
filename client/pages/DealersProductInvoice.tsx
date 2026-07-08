@@ -132,6 +132,7 @@ export default function DealersProductInvoice() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [hasGeneratedNumber, setHasGeneratedNumber] = useState(false);
 
   useEffect(() => {
     void loadInvoices();
@@ -139,13 +140,17 @@ export default function DealersProductInvoice() {
   }, []);
 
   useEffect(() => {
-    if (!editingId && form.invoice_number === "") {
+    if (!editingId && !hasGeneratedNumber && form.invoice_number === "") {
       setForm((prev) => ({
         ...prev,
         invoice_number: getNextInvoiceNumber(),
       }));
+      setHasGeneratedNumber(true);
     }
-  }, [editingId, form.invoice_number]);
+    if (editingId) {
+      setHasGeneratedNumber(true);
+    }
+  }, [editingId, hasGeneratedNumber]);
 
   const loadInvoices = async () => {
     setIsLoading(true);
@@ -277,6 +282,7 @@ export default function DealersProductInvoice() {
       setForm(DEFAULT_FORM);
       setEditingId(null);
       setPreviewId(null);
+      setHasGeneratedNumber(false);
     } finally {
       setIsSaving(false);
     }
@@ -783,6 +789,7 @@ export default function DealersProductInvoice() {
                   onClick={() => {
                     setForm(DEFAULT_FORM);
                     setEditingId(null);
+                    setHasGeneratedNumber(false);
                   }}
                   variant="outline"
                 >

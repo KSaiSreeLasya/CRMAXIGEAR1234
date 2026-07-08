@@ -206,23 +206,35 @@ export default function DealerInvoice() {
     void loadDealers();
   }, []);
 
+  // Generate invoice numbers only on initial form creation, never for existing invoices
+  const [hasGeneratedDealerNumber, setHasGeneratedDealerNumber] = useState(false);
+  const [hasGeneratedSparesNumber, setHasGeneratedSparesNumber] = useState(false);
+
   useEffect(() => {
-    if (!editingId && form.dealerInvoiceNo === "") {
+    if (!editingId && !hasGeneratedDealerNumber && form.dealerInvoiceNo === "") {
       setForm((prev) => ({
         ...prev,
         dealerInvoiceNo: getNextDealerInvoiceNumber(),
       }));
+      setHasGeneratedDealerNumber(true);
     }
-  }, [editingId, form.dealerInvoiceNo]);
+    if (editingId) {
+      setHasGeneratedDealerNumber(true);
+    }
+  }, [editingId, hasGeneratedDealerNumber]);
 
   useEffect(() => {
-    if (!editingSparesId && sparesForm.dealerInvoiceNo === "") {
+    if (!editingSparesId && !hasGeneratedSparesNumber && sparesForm.dealerInvoiceNo === "") {
       setSparesForm((prev) => ({
         ...prev,
         dealerInvoiceNo: getNextSparesInvoiceNumber(),
       }));
+      setHasGeneratedSparesNumber(true);
     }
-  }, [editingSparesId, sparesForm.dealerInvoiceNo]);
+    if (editingSparesId) {
+      setHasGeneratedSparesNumber(true);
+    }
+  }, [editingSparesId, hasGeneratedSparesNumber]);
 
 const loadInvoices = async () => {
   setIsLoading(true);
@@ -582,6 +594,7 @@ const loadSparesInvoices = async () => {
       setForm(DEFAULT_FORM);
       setEditingId(null);
       setPreviewId(null);
+      setHasGeneratedDealerNumber(false);
     } finally {
       setIsSaving(false);
     }
@@ -830,6 +843,7 @@ const loadSparesInvoices = async () => {
       setSparesForm(DEFAULT_FORM);
       setEditingSparesId(null);
       setSparesPreviewId(null);
+      setHasGeneratedSparesNumber(false);
     } finally {
       setIsSaving(false);
     }
@@ -1361,6 +1375,7 @@ const loadSparesInvoices = async () => {
                   onClick={() => {
                     setForm(DEFAULT_FORM);
                     setEditingId(null);
+                    setHasGeneratedDealerNumber(false);
                   }}
                   variant="outline"
                 >
@@ -1888,6 +1903,7 @@ const loadSparesInvoices = async () => {
                       onClick={() => {
                         setSparesForm(DEFAULT_FORM);
                         setEditingSparesId(null);
+                        setHasGeneratedSparesNumber(false);
                       }}
                       variant="outline"
                     >

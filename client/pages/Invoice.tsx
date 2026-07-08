@@ -33,9 +33,20 @@ export default function Invoice() {
     try {
       const saved = localStorage.getItem(settingsKey);
       if (!saved) {
-        setInvoiceNo(getNextInvoiceNumber());
+        // First time opening this invoice - generate and immediately save the number
+        const newInvoiceNo = getNextInvoiceNumber();
+        setInvoiceNo(newInvoiceNo);
         setGstType("cgst-sgst");
         setPlaceOfSupply("TG");
+        // Save immediately so number is never regenerated
+        localStorage.setItem(
+          settingsKey,
+          JSON.stringify({
+            invoiceNo: newInvoiceNo,
+            gstType: "cgst-sgst",
+            placeOfSupply: "TG",
+          }),
+        );
         return;
       }
 
@@ -44,19 +55,33 @@ export default function Invoice() {
         gstType?: "igst" | "cgst-sgst";
         placeOfSupply?: string;
       };
-      setInvoiceNo(parsed.invoiceNo || getNextInvoiceNumber());
+      // Load saved settings - use invoiceNo as-is (never regenerate)
+      setInvoiceNo(parsed.invoiceNo || "");
       setGstType(parsed.gstType === "igst" || parsed.gstType === "cgst-sgst" ? parsed.gstType : "cgst-sgst");
       setPlaceOfSupply(parsed.placeOfSupply || "TG");
     } catch (error) {
       console.error("Error loading saved invoice settings:", error);
-      setInvoiceNo(getNextInvoiceNumber());
+      const newInvoiceNo = getNextInvoiceNumber();
+      setInvoiceNo(newInvoiceNo);
       setGstType("cgst-sgst");
       setPlaceOfSupply("TG");
+      try {
+        localStorage.setItem(
+          settingsKey,
+          JSON.stringify({
+            invoiceNo: newInvoiceNo,
+            gstType: "cgst-sgst",
+            placeOfSupply: "TG",
+          }),
+        );
+      } catch (saveError) {
+        console.error("Error saving initial invoice settings:", saveError);
+      }
     }
   }, [settingsKey]);
 
   useEffect(() => {
-    if (!settingsKey) return;
+    if (!settingsKey || !invoiceNo) return;
     try {
       localStorage.setItem(
         settingsKey,
