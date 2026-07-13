@@ -464,6 +464,7 @@ export default function Projects() {
             lead_source: newProject.leadSource || null,
             gst_no: newProject.gstNo || null,
             sale_type: newProject.saleType || "regular",
+            invoice_no: newProject.invoiceNo || null,
             show_split_payment_details: newProject.showSplitPaymentDetails ?? false,
           };
 
@@ -581,6 +582,7 @@ export default function Projects() {
             lead_source: updatedData.leadSource || null,
             gst_no: updatedData.gstNo || null,
             sale_type: updatedData.saleType || "regular",
+            invoice_no: updatedData.invoiceNo || null,
             show_split_payment_details: updatedData.showSplitPaymentDetails ?? false,
           };
 
@@ -735,6 +737,7 @@ export default function Projects() {
         amount: Number(item.amount || 0),
         mode_of_payment: item.modeOfPayment || "Cash",
         lead_source: item.leadSource || null,
+        invoice_no: item.invoiceNo || null,
       }));
 
       if (supabase) {
@@ -765,6 +768,7 @@ export default function Projects() {
               amount: row.amount,
               modeOfPayment: row.mode_of_payment || "Cash",
               leadSource: row.lead_source || "",
+              invoiceNo: row.invoice_no || "",
               createdAt: new Date(row.created_at).toLocaleDateString(),
             });
           });
@@ -789,6 +793,7 @@ export default function Projects() {
               amount: Number(item.amount || 0),
               modeOfPayment: item.modeOfPayment || "Cash",
               leadSource: item.leadSource || "",
+              invoiceNo: item.invoiceNo || "",
               createdAt: new Date().toLocaleDateString(),
             };
             newProjects.push(project);
