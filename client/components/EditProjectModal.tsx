@@ -38,6 +38,7 @@ export default function EditProjectModal({
     leadSource: "",
     gstNo: "",
     saleType: "regular",
+    invoiceNo: "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -69,6 +70,7 @@ export default function EditProjectModal({
         leadSource: project.leadSource || "",
         gstNo: project.gstNo || "",
         saleType: project.saleType || "regular",
+        invoiceNo: project.invoiceNo || "",
       });
       setShowSplitPaymentDetails(project.showSplitPaymentDetails ?? false);
 
@@ -123,9 +125,6 @@ export default function EditProjectModal({
     if (!formData.productDescription.trim()) {
       newErrors.productDescription = "Product description is required";
     }
-    if (!formData.batteryCapacity.trim()) {
-      newErrors.batteryCapacity = "Battery capacity is required";
-    }
     if (!formData.invoiceDate.trim()) {
       newErrors.invoiceDate = "Invoice date is required";
     }
@@ -165,6 +164,7 @@ export default function EditProjectModal({
       leadSource: formData.leadSource,
       gstNo: formData.gstNo,
       saleType: formData.saleType as "regular" | "b2b",
+      invoiceNo: formData.invoiceNo,
       splitPayments: splitPayments,
       showSplitPaymentDetails,
     });
@@ -510,22 +510,15 @@ export default function EditProjectModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold mb-2">Battery capacity *</label>
+                <label className="block text-sm font-semibold mb-2">Battery capacity</label>
                 <input
                   type="text"
                   name="batteryCapacity"
                   value={formData.batteryCapacity}
                   onChange={handleChange}
                   placeholder="e.g. 3.5 kWh"
-                  className={`w-full px-4 py-2 border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.batteryCapacity ? "border-destructive" : "border-border"
-                  }`}
+                  className="w-full px-4 py-2 border rounded-lg bg-background border-border focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-                {errors.batteryCapacity && (
-                  <p className="text-sm text-destructive mt-1">
-                    {errors.batteryCapacity}
-                  </p>
-                )}
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-semibold mb-2">Vehicle warranty</label>
@@ -618,6 +611,19 @@ export default function EditProjectModal({
                 placeholder="e.g. 36ACJFA4386L1ZW"
                 className="w-full px-4 py-2 border border-border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2">Invoice No.</label>
+              <input
+                type="text"
+                name="invoiceNo"
+                value={formData.invoiceNo}
+                onChange={handleChange}
+                placeholder={formData.saleType === "b2b" ? "e.g. AAV/B2B/2026-27-001" : "e.g. AAV/2026-27-001"}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Update invoice number if needed</p>
             </div>
 
             {/* Split Payment Section */}

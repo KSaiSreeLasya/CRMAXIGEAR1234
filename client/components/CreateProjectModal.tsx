@@ -35,6 +35,7 @@ export default function CreateProjectModal({
     leadSource: "",
     gstNo: "",
     saleType: "regular",
+    invoiceNo: "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -90,9 +91,6 @@ export default function CreateProjectModal({
     if (!formData.productDescription.trim()) {
       newErrors.productDescription = "Product description is required";
     }
-    if (!formData.batteryCapacity.trim()) {
-      newErrors.batteryCapacity = "Battery capacity is required";
-    }
     if (!formData.invoiceDate.trim()) {
       newErrors.invoiceDate = "Invoice date is required";
     }
@@ -113,6 +111,7 @@ export default function CreateProjectModal({
       return;
     }
 
+    const invoiceNo = formData.invoiceNo.trim() || getNextInvoiceNumber(formData.saleType);
     await onCreateProject({
       modelNo: formData.modelNo,
       customerName: formData.customerName,
@@ -132,6 +131,7 @@ export default function CreateProjectModal({
       leadSource: formData.leadSource,
       gstNo: formData.gstNo,
       saleType: formData.saleType as "regular" | "b2b",
+      invoiceNo,
       showSplitPaymentDetails,
     }, splitPayments);
 
@@ -155,6 +155,7 @@ export default function CreateProjectModal({
       leadSource: "",
       gstNo: "",
       saleType: "regular",
+      invoiceNo: "",
     });
     setSplitPayments([]);
     setShowSplitPaymentDetails(false);
@@ -512,22 +513,15 @@ export default function CreateProjectModal({
     )}
   </div>
               <div>
-                <label className="block text-sm font-semibold mb-2">Battery capacity *</label>
+                <label className="block text-sm font-semibold mb-2">Battery capacity</label>
                 <input
                   type="text"
                   name="batteryCapacity"
                   value={formData.batteryCapacity}
                   onChange={handleChange}
                   placeholder="e.g. 3.5 kWh"
-                  className={`w-full px-4 py-2 border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.batteryCapacity ? "border-destructive" : "border-border"
-                  }`}
+                  className="w-full px-4 py-2 border rounded-lg bg-background border-border focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-                {errors.batteryCapacity && (
-                  <p className="text-sm text-destructive mt-1">
-                    {errors.batteryCapacity}
-                  </p>
-                )}
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-semibold mb-2">Vehicle warranty</label>
@@ -622,6 +616,19 @@ export default function CreateProjectModal({
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-semibold mb-2">Invoice No.</label>
+              <input
+                type="text"
+                name="invoiceNo"
+                value={formData.invoiceNo}
+                onChange={handleChange}
+                placeholder={formData.saleType === "b2b" ? "e.g. AAV/B2B/2026-27-001" : "e.g. AAV/2026-27-001"}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Leave empty to auto-generate based on sale type</p>
+            </div>
+
             {/* Split Payment Section */}
             <div className="border border-border rounded-lg p-6">
               <h3 className="font-semibold text-sm mb-4">Payment Breakdown (Split Payments)</h3>
@@ -668,4 +675,39 @@ export default function CreateProjectModal({
       </div>
     </>
   );
+}
+
+function getNextInvoiceNumber(saleType: string): string {
+  const isB2B = saleType === "b2b";
+  const defaultInvoiceNo = isB2B ? "AAV/B2B/2026-27-001" : "AAV/2026-27-001";
+  let maxNumericSuffix = 0;
+
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("crm_invoice_settings_")) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { invoiceNo?: string };
+      const invoice = parsed.invoiceNo?.trim();
+      if (!invoice) continue;
+
+      const isB2BInvoice = invoice.includes("/B2B/");
+      if (isB2BInvoice !== isB2B) continue;
+
+      const match = invoice.match(/(\d+)$/);
+      if (!match) continue;
+      const numericValue = Number(match[1]);
+      if (Number.isNaN(numericValue)) continue;
+
+      if (numericValue > maxNumericSuffix) {
+        maxNumericSuffix = numericValue;
+      }
+    }
+  } catch (error) {
+    console.error("Error deriving next invoice number:", error);
+  }
+
+  const nextNumber = (maxNumericSuffix + 1).toString().padStart(3, "0");
+  return isB2B ? `AAV/B2B/2026-27-${nextNumber}` : `AAV/2026-27-${nextNumber}`;
 }
