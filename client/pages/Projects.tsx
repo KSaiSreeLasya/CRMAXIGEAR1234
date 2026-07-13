@@ -1,7 +1,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, Trash2, Edit, FileText, ArrowLeft, Download } from "lucide-react";
+import { Plus, Trash2, Edit, FileText, ArrowLeft, Download, Search as SearchIcon, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CreateProjectModal from "@/components/CreateProjectModal";
@@ -81,6 +81,8 @@ export default function Projects() {
   const [isLoadingEstimations, setIsLoadingEstimations] = useState(false);
   const [isSavingEstimation, setIsSavingEstimation] = useState(false);
   const [saleTypeFilter, setSaleTypeFilter] = useState<"regular" | "b2b">("regular");
+  const [projectSearchQuery, setProjectSearchQuery] = useState("");
+  const [estimationSearchQuery, setEstimationSearchQuery] = useState("");
 
   // Load projects and estimations from Supabase on mount
   useEffect(() => {
@@ -688,6 +690,27 @@ export default function Projects() {
     }).format(amount);
   };
 
+  const filteredProjects = projects.filter((p) => {
+    const matchesSaleType = (p.saleType || "regular") === saleTypeFilter;
+    const matchesSearch = projectSearchQuery.toLowerCase() === "" ||
+      p.customerName.toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
+      p.contactNo.toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
+      p.location.toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
+      p.modelNo.toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
+      p.chassisNo.toLowerCase().includes(projectSearchQuery.toLowerCase());
+
+    return matchesSaleType && matchesSearch;
+  });
+
+  const filteredEstimations = estimations.filter((est) => {
+    return estimationSearchQuery.toLowerCase() === "" ||
+      est.customerName.toLowerCase().includes(estimationSearchQuery.toLowerCase()) ||
+      est.contactNo.toLowerCase().includes(estimationSearchQuery.toLowerCase()) ||
+      est.address.toLowerCase().includes(estimationSearchQuery.toLowerCase()) ||
+      est.model.toLowerCase().includes(estimationSearchQuery.toLowerCase()) ||
+      est.estimationSlipNo.toLowerCase().includes(estimationSearchQuery.toLowerCase());
+  });
+
   const handleImportProjects = async (importedItems: Record<string, any>[]) => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -908,6 +931,28 @@ export default function Projects() {
                 />
               </div>
 
+              {/* Search Section */}
+              <div className="bg-card rounded-lg border border-border p-6">
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by customer name, contact no., location, model, or chassis no..."
+                    value={projectSearchQuery}
+                    onChange={(e) => setProjectSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-10 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  {projectSearchQuery && (
+                    <button
+                      onClick={() => setProjectSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {isLoading ? (
                 <div className="bg-card rounded-lg border border-border p-12 text-center">
                   <div className="space-y-4 max-w-md mx-auto">
@@ -940,9 +985,11 @@ export default function Projects() {
                     </TabsList>
                   </Tabs>
 
-                  {projects.filter((p) => (p.saleType || "regular") === saleTypeFilter).length === 0 ? (
+                  {filteredProjects.length === 0 ? (
                     <div className="bg-card rounded-lg border border-border p-8 text-center">
-                      <p className="text-muted-foreground">No {saleTypeFilter === "b2b" ? "B2B" : "regular"} sales yet</p>
+                      <p className="text-muted-foreground">
+                        {projectSearchQuery ? "No sales match your search" : `No ${saleTypeFilter === "b2b" ? "B2B" : "regular"} sales yet`}
+                      </p>
                     </div>
                   ) : (
                     <table className="w-full text-sm">
@@ -990,7 +1037,7 @@ export default function Projects() {
                       </tr>
                     </thead>
                     <tbody>
-                      {projects.filter((p) => (p.saleType || "regular") === saleTypeFilter).map((project) => (
+                      {filteredProjects.map((project) => (
                         <tr
                           key={project.id}
                           className="border-b border-border hover:bg-muted/50 transition-colors text-xs"
@@ -1073,6 +1120,28 @@ export default function Projects() {
                   filename="estimations.csv"
                   title="Sales Pipeline Estimations"
                 />
+              </div>
+
+              {/* Search Section */}
+              <div className="bg-card rounded-lg border border-border p-6">
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by customer name, contact no., address, model, or slip no..."
+                    value={estimationSearchQuery}
+                    onChange={(e) => setEstimationSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-10 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  {estimationSearchQuery && (
+                    <button
+                      onClick={() => setEstimationSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="bg-card rounded-lg border border-border p-6">
@@ -1194,6 +1263,8 @@ export default function Projects() {
                   <p className="text-muted-foreground">Loading estimations...</p>
                 ) : estimations.length === 0 ? (
                   <p className="text-muted-foreground">No estimations yet.</p>
+                ) : filteredEstimations.length === 0 ? (
+                  <p className="text-muted-foreground">No estimations match your search.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[1200px] text-sm">
@@ -1212,7 +1283,7 @@ export default function Projects() {
                         </tr>
                       </thead>
                       <tbody>
-                        {estimations.map((est) => (
+                        {filteredEstimations.map((est) => (
                           <tr key={est.id} className="border-b border-border">
                             <td className="px-4 py-2">{est.estimationSlipNo}</td>
                             <td className="px-4 py-2">{est.customerName}</td>
