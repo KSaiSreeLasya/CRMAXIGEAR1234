@@ -17,7 +17,8 @@ interface ProductRow {
   productDescription: string;
   amount: number;
   unit: number;
-  gstRate: number; // 5 or 18
+  gstRate: number;
+  type?: "single" | "bulk"; // single: unit price * qty, bulk: total amount
 }
 
 interface DealerInvoiceRecord {
@@ -71,6 +72,7 @@ const DEFAULT_PRODUCT_ROW: ProductRow = {
   amount: 0,
   unit: 1,
   gstRate: 18,
+  type: "single",
 };
 
 interface InvoiceForm {
@@ -241,7 +243,8 @@ const loadInvoices = async () => {
 
   try {
     if (!supabase) {
-      console.error("Supabase client not initialized");
+      const saved = localStorage.getItem("crm_dealer_invoices");
+      setInvoices(saved ? JSON.parse(saved) : []);
       return;
     }
 
@@ -304,6 +307,8 @@ const loadInvoices = async () => {
     setInvoices(mappedInvoices);
   } catch (error) {
     console.error("Load Invoice Error:", error);
+    const saved = localStorage.getItem("crm_dealer_invoices");
+    setInvoices(saved ? JSON.parse(saved) : []);
   } finally {
     setIsLoading(false);
   }
@@ -606,6 +611,9 @@ const loadSparesInvoices = async () => {
     try {
       if (supabase) {
         try {
+          // Delete invoice items first
+          await supabase.from("dealers_invoice_items").delete().eq("invoice_id", id);
+          // Then delete the invoice
           await supabase.from("dealers_invoices").delete().eq("id", id);
         } catch (error) {
           console.warn("Supabase delete failed, using localStorage");
@@ -617,7 +625,7 @@ const loadSparesInvoices = async () => {
       const updated = invoicesList.filter(i => i.id !== id);
       localStorage.setItem("crm_dealer_invoices", JSON.stringify(updated));
 
-      setInvoices(updated);
+      await loadInvoices();
     } catch (error) {
       console.error("Error deleting invoice:", error);
     }
@@ -855,6 +863,9 @@ const loadSparesInvoices = async () => {
     try {
       if (supabase) {
         try {
+          // Delete spares invoice items first
+          await supabase.from("spares_invoice_products").delete().eq("spares_invoice_id", id);
+          // Then delete the spares invoice
           await supabase.from("spares_invoices").delete().eq("id", id);
         } catch (error) {
           console.warn("Supabase delete failed, using localStorage");
@@ -865,7 +876,7 @@ const loadSparesInvoices = async () => {
       const invoicesList: SparesInvoiceRecord[] = current ? JSON.parse(current) : [];
       const updated = invoicesList.filter(i => i.id !== id);
       localStorage.setItem("crm_spares_invoices", JSON.stringify(updated));
-      setSparesInvoices(updated);
+      await loadSparesInvoices();
     } catch (error) {
       console.error("Error deleting spares invoice:", error);
     }
@@ -1191,97 +1202,175 @@ const loadSparesInvoices = async () => {
             {/* Products Section */}
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-4">Products</h3>
-              <div className="mb-2 flex gap-2 items-center text-xs font-semibold text-gray-600 px-2">
-                <div className="flex-1">Product</div>
-                <div className="flex-1">Description</div>
-                <div className="w-20 text-right">Unit</div>
-                <div className="w-24 text-right">Amount</div>
-                <div className="w-20 text-center">GST Rate</div>
-                <div className="w-20 text-right">Total</div>
-                <div className="w-20 text-right">GST Amt</div>
-              </div>
-              <div className="space-y-3">
-                {form.products.map((product, idx) => (
-                  <div key={product.id} className="flex gap-2 items-end">
-                    <input
-                      type="text"
-                      placeholder="Product name"
-                      value={product.product}
-                      onChange={(e) => {
-                        const updated = [...form.products];
-                        updated[idx].product = e.target.value;
-                        setForm({ ...form, products: updated });
-                      }}
-                      className="flex-1 px-3 py-2 border rounded-md text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      value={product.productDescription}
-                      onChange={(e) => {
-                        const updated = [...form.products];
-                        updated[idx].productDescription = e.target.value;
-                        setForm({ ...form, products: updated });
-                      }}
-                      className="flex-1 px-3 py-2 border rounded-md text-sm"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Unit"
-                      value={product.unit}
-                      onChange={(e) => {
-                        const updated = [...form.products];
-                        updated[idx].unit = parseFloat(e.target.value) || 0;
-                        setForm({ ...form, products: updated });
-                      }}
-                      className="w-20 px-3 py-2 border rounded-md text-sm"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      value={product.amount}
-                      onChange={(e) => {
-                        const updated = [...form.products];
-                        updated[idx].amount = parseFloat(e.target.value) || 0;
-                        setForm({ ...form, products: updated });
-                      }}
-                      className="w-24 px-3 py-2 border rounded-md text-sm"
-                    />
-                    <select
-                      value={product.gstRate || 18}
-                      onChange={(e) => {
-                        const updated = [...form.products];
-                        updated[idx].gstRate = parseFloat(e.target.value);
-                        setForm({ ...form, products: updated });
-                      }}
-                      className="w-20 px-3 py-2 border rounded-md text-sm"
-                      title="GST Rate"
-                    >
-                      <option value="5">GST 5%</option>
-                      <option value="18">GST 18%</option>
-                    </select>
-                    <span className="w-20 px-3 py-2 text-sm font-medium text-right">
-                      ₹{((product.amount * product.unit) + ((product.amount * product.unit * (product.gstRate || 18)) / 100)).toFixed(2)}
-                    </span>
-                    <span className="w-20 px-3 py-2 text-sm font-medium text-right text-blue-600">
-                      ₹{((product.amount * product.unit * (product.gstRate || 18)) / 100).toFixed(2)}
-                    </span>
-                    {form.products.length > 1 && (
-                      <Button
-                        onClick={() => {
-                          setForm({
-                            ...form,
-                            products: form.products.filter((_, i) => i !== idx),
-                          });
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {form.products.map((product, idx) => {
+                  const isBulk = product.type === "bulk";
+                  const lineTotal = isBulk ? product.amount : product.amount * product.unit;
+                  const gstAmount = (lineTotal * (product.gstRate || 18)) / 100;
+                  const totalWithGst = lineTotal + gstAmount;
+
+                  return (
+                    <div key={product.id} className="border rounded-lg p-4 bg-card space-y-3">
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="text-xs font-medium">Product Name</label>
+                          <input
+                            type="text"
+                            placeholder="Product name"
+                            value={product.product}
+                            onChange={(e) => {
+                              const updated = [...form.products];
+                              updated[idx].product = e.target.value;
+                              setForm({ ...form, products: updated });
+                            }}
+                            className="w-full px-3 py-2 border rounded-md text-sm"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-medium">Description</label>
+                          <input
+                            type="text"
+                            placeholder="Description"
+                            value={product.productDescription}
+                            onChange={(e) => {
+                              const updated = [...form.products];
+                              updated[idx].productDescription = e.target.value;
+                              setForm({ ...form, products: updated });
+                            }}
+                            className="w-full px-3 py-2 border rounded-md text-sm"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <label className="text-xs font-medium">Type</label>
+                          <select
+                            value={isBulk ? "bulk" : "single"}
+                            onChange={(e) => {
+                              const updated = [...form.products];
+                              updated[idx].type = e.target.value as "single" | "bulk";
+                              setForm({ ...form, products: updated });
+                            }}
+                            className="w-full px-3 py-2 border rounded-md text-sm"
+                          >
+                            <option value="single">Single Unit</option>
+                            <option value="bulk">Bulk</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {isBulk ? (
+                          <>
+                            <div className="w-28">
+                              <label className="text-xs font-medium">Quantity</label>
+                              <input
+                                type="number"
+                                placeholder="Qty"
+                                value={product.unit}
+                                onChange={(e) => {
+                                  const updated = [...form.products];
+                                  updated[idx].unit = parseFloat(e.target.value) || 0;
+                                  setForm({ ...form, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-xs font-medium">Total Amount (₹)</label>
+                              <input
+                                type="number"
+                                placeholder="Total amount"
+                                value={product.amount}
+                                onChange={(e) => {
+                                  const updated = [...form.products];
+                                  updated[idx].amount = parseFloat(e.target.value) || 0;
+                                  setForm({ ...form, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-28">
+                              <label className="text-xs font-medium">Unit (Qty)</label>
+                              <input
+                                type="number"
+                                placeholder="Qty"
+                                value={product.unit}
+                                onChange={(e) => {
+                                  const updated = [...form.products];
+                                  updated[idx].unit = parseFloat(e.target.value) || 0;
+                                  setForm({ ...form, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-xs font-medium">Unit Price (₹)</label>
+                              <input
+                                type="number"
+                                placeholder="Unit price"
+                                value={product.amount}
+                                onChange={(e) => {
+                                  const updated = [...form.products];
+                                  updated[idx].amount = parseFloat(e.target.value) || 0;
+                                  setForm({ ...form, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        <div className="w-32">
+                          <label className="text-xs font-medium">GST %</label>
+                          <input
+                            type="number"
+                            placeholder="0-100"
+                            min="0"
+                            value={product.gstRate !== undefined ? product.gstRate : 18}
+                            onChange={(e) => {
+                              const updated = [...form.products];
+                              updated[idx].gstRate = parseFloat(e.target.value) ?? 18;
+                              setForm({ ...form, products: updated });
+                            }}
+                            className="w-full px-3 py-2 border rounded-md text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4 bg-muted p-3 rounded text-sm">
+                        <div>
+                          <span className="font-medium">Line Total:</span>
+                          <span className="ml-2">₹{lineTotal.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">GST:</span>
+                          <span className="ml-2 text-blue-600">₹{gstAmount.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">With GST:</span>
+                          <span className="ml-2 text-green-600">₹{totalWithGst.toFixed(2)}</span>
+                        </div>
+                        {form.products.length > 1 && (
+                          <Button
+                            onClick={() => {
+                              setForm({
+                                ...form,
+                                products: form.products.filter((_, i) => i !== idx),
+                              });
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <Button
                 onClick={() => {
@@ -1720,97 +1809,175 @@ const loadSparesInvoices = async () => {
                 {/* Spares Products Section */}
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold mb-4">Spares Products</h3>
-                  <div className="mb-2 flex gap-2 items-center text-xs font-semibold text-gray-600 px-2">
-                    <div className="flex-1">Product</div>
-                    <div className="flex-1">Description</div>
-                    <div className="w-20 text-right">Unit</div>
-                    <div className="w-24 text-right">Amount</div>
-                    <div className="w-20 text-center">GST Rate</div>
-                    <div className="w-20 text-right">Total</div>
-                    <div className="w-20 text-right">GST Amt</div>
-                  </div>
-                  <div className="space-y-3">
-                    {sparesForm.products.map((product, idx) => (
-                      <div key={product.id} className="flex gap-2 items-end">
-                        <input
-                          type="text"
-                          placeholder="Spare name"
-                          value={product.product}
-                          onChange={(e) => {
-                            const updated = [...sparesForm.products];
-                            updated[idx].product = e.target.value;
-                            setSparesForm({ ...sparesForm, products: updated });
-                          }}
-                          className="flex-1 px-3 py-2 border rounded-md text-sm"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Description"
-                          value={product.productDescription}
-                          onChange={(e) => {
-                            const updated = [...sparesForm.products];
-                            updated[idx].productDescription = e.target.value;
-                            setSparesForm({ ...sparesForm, products: updated });
-                          }}
-                          className="flex-1 px-3 py-2 border rounded-md text-sm"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Unit"
-                          value={product.unit}
-                          onChange={(e) => {
-                            const updated = [...sparesForm.products];
-                            updated[idx].unit = parseFloat(e.target.value) || 0;
-                            setSparesForm({ ...sparesForm, products: updated });
-                          }}
-                          className="w-20 px-3 py-2 border rounded-md text-sm"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Amount"
-                          value={product.amount}
-                          onChange={(e) => {
-                            const updated = [...sparesForm.products];
-                            updated[idx].amount = parseFloat(e.target.value) || 0;
-                            setSparesForm({ ...sparesForm, products: updated });
-                          }}
-                          className="w-24 px-3 py-2 border rounded-md text-sm"
-                        />
-                        <select
-                          value={product.gstRate || 18}
-                          onChange={(e) => {
-                            const updated = [...sparesForm.products];
-                            updated[idx].gstRate = parseFloat(e.target.value);
-                            setSparesForm({ ...sparesForm, products: updated });
-                          }}
-                          className="w-20 px-3 py-2 border rounded-md text-sm"
-                          title="GST Rate"
-                        >
-                          <option value="5">GST 5%</option>
-                          <option value="18">GST 18%</option>
-                        </select>
-                        <span className="w-20 px-3 py-2 text-sm font-medium text-right">
-                          ₹{((product.amount * product.unit) + ((product.amount * product.unit * (product.gstRate || 18)) / 100)).toFixed(2)}
-                        </span>
-                        <span className="w-20 px-3 py-2 text-sm font-medium text-right text-blue-600">
-                          ₹{((product.amount * product.unit * (product.gstRate || 18)) / 100).toFixed(2)}
-                        </span>
-                        {sparesForm.products.length > 1 && (
-                          <Button
-                            onClick={() => {
-                              setSparesForm({
-                                ...sparesForm,
-                                products: sparesForm.products.filter((_, i) => i !== idx),
-                              });
-                            }}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                  <div className="space-y-4">
+                    {sparesForm.products.map((product, idx) => {
+                      const isBulk = product.type === "bulk";
+                      const lineTotal = isBulk ? product.amount : product.amount * product.unit;
+                      const gstAmount = (lineTotal * (product.gstRate || 18)) / 100;
+                      const totalWithGst = lineTotal + gstAmount;
+
+                      return (
+                        <div key={product.id} className="border rounded-lg p-4 bg-card space-y-3">
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <label className="text-xs font-medium">Spare Name</label>
+                              <input
+                                type="text"
+                                placeholder="Spare name"
+                                value={product.product}
+                                onChange={(e) => {
+                                  const updated = [...sparesForm.products];
+                                  updated[idx].product = e.target.value;
+                                  setSparesForm({ ...sparesForm, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-xs font-medium">Description</label>
+                              <input
+                                type="text"
+                                placeholder="Description"
+                                value={product.productDescription}
+                                onChange={(e) => {
+                                  const updated = [...sparesForm.products];
+                                  updated[idx].productDescription = e.target.value;
+                                  setSparesForm({ ...sparesForm, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              />
+                            </div>
+                            <div className="w-32">
+                              <label className="text-xs font-medium">Type</label>
+                              <select
+                                value={isBulk ? "bulk" : "single"}
+                                onChange={(e) => {
+                                  const updated = [...sparesForm.products];
+                                  updated[idx].type = e.target.value as "single" | "bulk";
+                                  setSparesForm({ ...sparesForm, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              >
+                                <option value="single">Single Unit</option>
+                                <option value="bulk">Bulk</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            {isBulk ? (
+                              <>
+                                <div className="w-28">
+                                  <label className="text-xs font-medium">Quantity</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Qty"
+                                    value={product.unit}
+                                    onChange={(e) => {
+                                      const updated = [...sparesForm.products];
+                                      updated[idx].unit = parseFloat(e.target.value) || 0;
+                                      setSparesForm({ ...sparesForm, products: updated });
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-md text-sm"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-xs font-medium">Total Amount (₹)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Total amount"
+                                    value={product.amount}
+                                    onChange={(e) => {
+                                      const updated = [...sparesForm.products];
+                                      updated[idx].amount = parseFloat(e.target.value) || 0;
+                                      setSparesForm({ ...sparesForm, products: updated });
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-md text-sm"
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-28">
+                                  <label className="text-xs font-medium">Unit (Qty)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Qty"
+                                    value={product.unit}
+                                    onChange={(e) => {
+                                      const updated = [...sparesForm.products];
+                                      updated[idx].unit = parseFloat(e.target.value) || 0;
+                                      setSparesForm({ ...sparesForm, products: updated });
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-md text-sm"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-xs font-medium">Unit Price (₹)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Unit price"
+                                    value={product.amount}
+                                    onChange={(e) => {
+                                      const updated = [...sparesForm.products];
+                                      updated[idx].amount = parseFloat(e.target.value) || 0;
+                                      setSparesForm({ ...sparesForm, products: updated });
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-md text-sm"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            <div className="w-32">
+                              <label className="text-xs font-medium">GST %</label>
+                              <input
+                                type="number"
+                                placeholder="0-100"
+                                min="0"
+                                value={product.gstRate !== undefined ? product.gstRate : 18}
+                                onChange={(e) => {
+                                  const updated = [...sparesForm.products];
+                                  updated[idx].gstRate = parseFloat(e.target.value) ?? 18;
+                                  setSparesForm({ ...sparesForm, products: updated });
+                                }}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex gap-4 bg-muted p-3 rounded text-sm">
+                            <div>
+                              <span className="font-medium">Line Total:</span>
+                              <span className="ml-2">₹{lineTotal.toFixed(2)}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium">GST:</span>
+                              <span className="ml-2 text-blue-600">₹{gstAmount.toFixed(2)}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium">With GST:</span>
+                              <span className="ml-2 text-green-600">₹{totalWithGst.toFixed(2)}</span>
+                            </div>
+                            {sparesForm.products.length > 1 && (
+                              <Button
+                                onClick={() => {
+                                  setSparesForm({
+                                    ...sparesForm,
+                                    products: sparesForm.products.filter((_, i) => i !== idx),
+                                  });
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="ml-auto"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                   <Button
                     onClick={() => {
@@ -2018,7 +2185,7 @@ const loadSparesInvoices = async () => {
                       {sparesInvoices.find((i) => i.id === sparesPreviewId) && (
                         <div id={`spares-invoice-preview-${sparesPreviewId}`}>
                           <DealerInvoiceContent
-                            invoice={sparesInvoices.find((i) => i.id === sparesPreviewId)!}
+                            invoice={sparesInvoices.find((i) => i.id === sparesPreviewId)! as unknown as DealerInvoiceRecord}
                             gstType={gstType}
                           />
                         </div>
