@@ -136,4 +136,27 @@
     overflow-x: auto;
     white-space: pre;
   }
+
+  .inventory-table-scroll {
+    scrollbar-gutter: stable;
+    scrollbar-width: auto;
+  }
+
+  .inventory-table-scroll::-webkit-scrollbar {
+    height: 12px;
+  }
+
+  .inventory-table-scroll::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 9999px;
+  }
+
+  .inventory-table-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground));
+    border-radius: 9999px;
+  }
+
+  .inventory-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--foreground));
+  }
 }
