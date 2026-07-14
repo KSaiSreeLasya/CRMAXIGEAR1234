@@ -9,26 +9,8 @@ import { getEmployeeSession, isAdminUser } from "@/lib/auth";
 import { SpareImportExport } from "@/components/SpareImportExport";
 import { ImportExport } from "@/components/ImportExport";
 import { IncomingDealerShipments } from "@/components/inventory/IncomingDealerShipments";
-
-interface InventoryItem {
-  id: string;
-  slNo: number;
-  modelNo: string;
-  brand: string;
-  vehicleModel: string;
-  hsnNo: string;
-  vehicleCount: number;
-  chassisNo: string;
-  previousChassisNo: string;
-  motorNo: string;
-  batteryNo: string;
-  manufacturerInvNo: string;
-  batteryModel: string;
-  batteryCount: number;
-  salesCount: number;
-  closingStock: number;
-  createdAt: string;
-}
+import { InventoryRowDetails } from "@/components/inventory/InventoryRowDetails";
+import { InventoryItem } from "@/types/inventory";
 
 interface ChassisInputState {
   inputs: string[];
@@ -350,6 +332,7 @@ export default function Inventory() {
             id: `inventory_${Date.now()}`,
             createdAt: new Date().toLocaleDateString(),
             ...payload,
+            previousChassisNo: "",
           };
           persistLocal([...items, created].sort((a, b) => a.slNo - b.slNo));
         }
@@ -1183,6 +1166,13 @@ export default function Inventory() {
           </TabsContent>
 
         </Tabs>
+
+        <InventoryRowDetails
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       </div>
     </Layout>
   );

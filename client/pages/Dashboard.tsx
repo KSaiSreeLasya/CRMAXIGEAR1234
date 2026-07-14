@@ -1,8 +1,53 @@
 import Layout from "@/components/Layout";
-import { Briefcase, CalendarCheck2, Boxes, ShieldCheck, Wrench, Users, Receipt, Truck, AlertCircle } from "lucide-react";
+import { Briefcase, CalendarCheck2, Boxes, ShieldCheck, Wrench, Users, Receipt, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+interface UpcomingDelivery {
+  id: string;
+  project_name: string;
+  delivery_date: string;
+  deliverables: string;
+}
 
 export default function Dashboard() {
+  const [upcomingDeliveries, setUpcomingDeliveries] = useState<UpcomingDelivery[]>([]);
+  const [isLoadingDeliveries, setIsLoadingDeliveries] = useState(true);
+
+  useEffect(() => {
+    fetchUpcomingDeliveries();
+  }, []);
+
+  const fetchUpcomingDeliveries = async () => {
+    setIsLoadingDeliveries(true);
+    try {
+      if (supabase) {
+        const today = new Date().toISOString().split('T')[0];
+        const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const { data, error } = await supabase
+          .from('deliveries')
+          .select('id, project_name, delivery_date, deliverables')
+          .eq('status', 'pending')
+          .gte('delivery_date', today)
+          .lte('delivery_date', sevenDaysLater)
+          .order('delivery_date', { ascending: true });
+
+        if (error) {
+          console.warn("Could not fetch upcoming deliveries:", error?.message);
+          setUpcomingDeliveries([]);
+        } else {
+          setUpcomingDeliveries(data || []);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching upcoming deliveries:", error);
+      setUpcomingDeliveries([]);
+    } finally {
+      setIsLoadingDeliveries(false);
+    }
+  };
 
   return (
     <Layout>
@@ -15,15 +60,36 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="h-6 w-6 text-blue-600 flex-shrink-0" />
-            <div>
-              <h3 className="font-semibold text-blue-900">Gatekeeper Function</h3>
-              <p className="text-sm text-blue-800">
-                The CRM acts as a gatekeeper for incoming dealer shipments. Visit the <strong>INVENTORY</strong> module and open the <strong>"Incoming Shipments"</strong> tab to review and manage pending dealer requests.
-              </p>
+          {!isLoadingDeliveries && upcomingDeliveries.length > 0 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-start gap-3 mb-3">
+                <Truck className="h-6 w-6 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-orange-900">Upcoming Deliveries (Next 7 Days)</h3>
+                  <p className="text-sm text-orange-800 mt-1">
+                    You have <strong>{upcomingDeliveries.length}</strong> delivery(ies) scheduled in the next 7 days.
+                  </p>
+                </div>
+              </div>
+              <div className="ml-9 space-y-2 max-h-48 overflow-y-auto">
+                {upcomingDeliveries.map((delivery) => (
+                  <div key={delivery.id} className="bg-white rounded p-3 border border-orange-100 text-sm">
+                    <div className="font-semibold text-orange-900">{delivery.project_name}</div>
+                    <div className="text-orange-700 text-xs">
+                      {new Date(delivery.delivery_date).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                    </div>
+                    <div className="text-orange-600 text-xs mt-1">{delivery.deliverables}</div>
+                  </div>
+                ))}
+              </div>
+              <Link
+                to="/delivery"
+                className="inline-block mt-3 text-sm font-semibold text-orange-700 hover:text-orange-900 underline"
+              >
+                View all deliveries →
+              </Link>
             </div>
-          </div>
+          )}
 
           {/* Modules Grid */}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl">
