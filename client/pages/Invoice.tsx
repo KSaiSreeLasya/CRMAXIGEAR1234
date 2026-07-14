@@ -112,6 +112,7 @@ export default function Invoice() {
               batteryCapacity: data.battery_capacity || "",
               vehicleWarranty: data.vehicle_warranty || "",
               invoiceDate: data.invoice_date || "",
+              deliveryDate: data.delivery_date || "",
               amount: data.amount,
               modeOfPayment: data.mode_of_payment || "Cash",
               leadSource: data.lead_source || "",

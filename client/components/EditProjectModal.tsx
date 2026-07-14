@@ -159,6 +159,7 @@ export default function EditProjectModal({
       batteryCapacity: formData.batteryCapacity,
       vehicleWarranty: formData.vehicleWarranty,
       invoiceDate: formData.invoiceDate,
+      deliveryDate: project.deliveryDate,
       amount: parseFloat(formData.amount),
       modeOfPayment: formData.modeOfPayment,
       leadSource: formData.leadSource,

@@ -30,6 +30,7 @@ export default function CreateProjectModal({
     batteryCapacity: "",
     vehicleWarranty: "",
     invoiceDate: "",
+    deliveryDate: "",
     amount: "",
     modeOfPayment: "Cash",
     leadSource: "",
@@ -107,6 +108,9 @@ export default function CreateProjectModal({
     if (!formData.invoiceDate.trim()) {
       newErrors.invoiceDate = "Invoice date is required";
     }
+    if (!formData.deliveryDate.trim()) {
+      newErrors.deliveryDate = "Delivery date is required";
+    }
     if (!formData.amount.trim()) {
       newErrors.amount = "Amount is required";
     } else if (isNaN(parseFloat(formData.amount))) {
@@ -139,6 +143,7 @@ export default function CreateProjectModal({
       batteryCapacity: formData.batteryCapacity,
       vehicleWarranty: formData.vehicleWarranty,
       invoiceDate: formData.invoiceDate,
+      deliveryDate: formData.deliveryDate,
       amount: parseFloat(formData.amount),
       modeOfPayment: formData.modeOfPayment,
       leadSource: formData.leadSource,
@@ -163,6 +168,7 @@ export default function CreateProjectModal({
       batteryCapacity: "",
       vehicleWarranty: "",
       invoiceDate: "",
+      deliveryDate: "",
       amount: "",
       modeOfPayment: "Cash",
       leadSource: "",
@@ -549,22 +555,42 @@ export default function CreateProjectModal({
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                Invoice Date *
-              </label>
-              <input
-                type="date"
-                name="invoiceDate"
-                value={formData.invoiceDate}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
-                  errors.invoiceDate ? "border-destructive" : "border-border"
-                }`}
-              />
-              {errors.invoiceDate && (
-                <p className="text-sm text-destructive mt-1">{errors.invoiceDate}</p>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Invoice Date *
+                </label>
+                <input
+                  type="date"
+                  name="invoiceDate"
+                  value={formData.invoiceDate}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2 border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
+                    errors.invoiceDate ? "border-destructive" : "border-border"
+                  }`}
+                />
+                {errors.invoiceDate && (
+                  <p className="text-sm text-destructive mt-1">{errors.invoiceDate}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Delivery Date *
+                </label>
+                <input
+                  type="date"
+                  name="deliveryDate"
+                  value={formData.deliveryDate}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2 border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
+                    errors.deliveryDate ? "border-destructive" : "border-border"
+                  }`}
+                />
+                {errors.deliveryDate && (
+                  <p className="text-sm text-destructive mt-1">{errors.deliveryDate}</p>
+                )}
+              </div>
             </div>
 
             <div>

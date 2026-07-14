@@ -56,6 +56,7 @@ export interface Project {
   batteryCapacity: string;
   vehicleWarranty: string;
   invoiceDate: string;
+  deliveryDate: string;
   amount: number;
   modeOfPayment: string;
   leadSource: string;
@@ -429,6 +430,7 @@ export default function Projects() {
         batteryCapacity: newProject.batteryCapacity,
         vehicleWarranty: newProject.vehicleWarranty,
         invoiceDate: newProject.invoiceDate,
+        deliveryDate: newProject.deliveryDate,
         amount: newProject.amount,
         modeOfPayment: newProject.modeOfPayment,
         leadSource: newProject.leadSource,
@@ -459,6 +461,7 @@ export default function Projects() {
             battery_capacity: newProject.batteryCapacity || null,
             vehicle_warranty: newProject.vehicleWarranty || null,
             invoice_date: newProject.invoiceDate || null,
+            delivery_date: newProject.deliveryDate || null,
             amount: newProject.amount,
             mode_of_payment: newProject.modeOfPayment,
             lead_source: newProject.leadSource || null,
@@ -502,6 +505,7 @@ export default function Projects() {
             batteryCapacity: data[0].battery_capacity || "",
             vehicleWarranty: data[0].vehicle_warranty || "",
             invoiceDate: data[0].invoice_date || "",
+            deliveryDate: data[0].delivery_date || "",
             amount: data[0].amount,
             modeOfPayment: data[0].mode_of_payment || "Cash",
             leadSource: data[0].lead_source || "",
@@ -512,6 +516,24 @@ export default function Projects() {
             showSplitPaymentDetails: data[0].show_split_payment_details ?? false,
             createdAt: new Date(data[0].created_at).toLocaleDateString(),
           };
+
+          // Create delivery record linked to this sale
+          if (newProject.deliveryDate) {
+            try {
+              await supabase
+                .from('deliveries')
+                .insert([{
+                  project_id: data[0].id,
+                  project_name: newProject.customerName,
+                  deliverables: newProject.productDescription,
+                  delivery_date: newProject.deliveryDate,
+                  status: 'pending',
+                  user_id: user.id,
+                }]);
+            } catch (deliveryError: any) {
+              console.warn("Warning: Could not create delivery record:", deliveryError?.message);
+            }
+          }
 
           // Create transaction with split payments
           if (splitPayments && splitPayments.length > 0) {
@@ -765,6 +787,7 @@ export default function Projects() {
               batteryCapacity: row.battery_capacity || "",
               vehicleWarranty: row.vehicle_warranty || "",
               invoiceDate: row.invoice_date || "",
+              deliveryDate: row.delivery_date || "",
               amount: row.amount,
               modeOfPayment: row.mode_of_payment || "Cash",
               leadSource: row.lead_source || "",
@@ -790,6 +813,7 @@ export default function Projects() {
               batteryCapacity: item.batteryCapacity || "",
               vehicleWarranty: item.vehicleWarranty || "",
               invoiceDate: item.invoiceDate,
+              deliveryDate: item.deliveryDate || "",
               amount: Number(item.amount || 0),
               modeOfPayment: item.modeOfPayment || "Cash",
               leadSource: item.leadSource || "",
