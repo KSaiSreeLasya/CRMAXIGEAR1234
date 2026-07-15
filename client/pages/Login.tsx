@@ -56,6 +56,7 @@ export default function Login() {
           employeeId: employee.employee_id,
           employeeName: employee.employee_name,
           employeeRole: employee.employee_role || "Employee",
+          email: email.trim().toLowerCase(),
           isAdmin: employee.employee_role === "Admin",
         });
         navigate("/dashboard", { replace: true });

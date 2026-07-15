@@ -215,11 +215,11 @@ create table if not exists public.employee_monthly_payroll (
   user_id uuid not null,
   employee_id uuid not null references public.employees (id) on delete cascade,
   year_month date not null,
-  num_presents integer not null default 0,
+  num_presents numeric(5, 2) not null default 0,
   num_weekly_offs integer not null default 0,
   num_absents integer not null default 0,
   num_leaves integer not null default 0,
-  paid_days integer not null default 0,
+  paid_days numeric(5, 2) not null default 0,
   gross_salary numeric(14, 2),
   net_salary numeric(14, 2),
   updated_at timestamptz not null default now (),
@@ -228,23 +228,27 @@ create table if not exists public.employee_monthly_payroll (
 
 create index if not exists idx_payroll_user_month on public.employee_monthly_payroll (user_id, year_month desc);
 
+alter table public.employee_monthly_payroll
+  alter column num_presents type numeric(5, 2),
+  alter column paid_days type numeric(5, 2);
+
 alter table public.employee_monthly_payroll enable row level security;
 
 drop policy if exists "payroll_select_own" on public.employee_monthly_payroll;
-create policy "payroll_select_own" on public.employee_monthly_payroll
-for select using (auth.uid() = user_id);
-
 drop policy if exists "payroll_insert_own" on public.employee_monthly_payroll;
-create policy "payroll_insert_own" on public.employee_monthly_payroll
-for insert with check (auth.uid() = user_id);
-
 drop policy if exists "payroll_update_own" on public.employee_monthly_payroll;
-create policy "payroll_update_own" on public.employee_monthly_payroll
-for update using (auth.uid() = user_id);
-
 drop policy if exists "payroll_delete_own" on public.employee_monthly_payroll;
-create policy "payroll_delete_own" on public.employee_monthly_payroll
-for delete using (auth.uid() = user_id);
+drop policy if exists "payroll_admin_only" on public.employee_monthly_payroll;
+
+create policy "payroll_admin_only" on public.employee_monthly_payroll
+for all using (
+  auth.uid() = user_id
+  and lower(coalesce(auth.jwt() ->> 'email', '')) = 'admin@axigear.in'
+)
+with check (
+  auth.uid() = user_id
+  and lower(coalesce(auth.jwt() ->> 'email', '')) = 'admin@axigear.in'
+);
 
 -- ---------------------------------------------------------------------------
 -- Vehicle / battery specs on projects (Sales) and estimations (Estimation cost)

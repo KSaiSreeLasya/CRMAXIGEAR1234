@@ -53,6 +53,7 @@ export const setEmployeeSession = (session: {
   employeeId: string;
   employeeName: string;
   employeeRole: string;
+  email?: string;
   isAdmin?: boolean;
 }) => {
   localStorage.setItem("auth_token", `employee-${session.employeeId}`);
@@ -63,6 +64,7 @@ export const getEmployeeSession = (): {
   employeeId: string;
   employeeName: string;
   employeeRole: string;
+  email?: string;
   isAdmin?: boolean;
 } | null => {
   const raw = localStorage.getItem(EMPLOYEE_SESSION_KEY);
