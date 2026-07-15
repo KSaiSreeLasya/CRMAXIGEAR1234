@@ -39,6 +39,7 @@ export default function Login() {
               "Sign-in did not return a session. Confirm your email in Supabase or try again.",
             );
           }
+          localStorage.removeItem("offline_user_email");
           navigate("/dashboard", { replace: true });
           return;
         }
@@ -52,15 +53,18 @@ export default function Login() {
         const employee = employeeData?.[0];
         if (!employee) throw error;
 
+        localStorage.removeItem("offline_user_email");
         setEmployeeSession({
           employeeId: employee.employee_id,
           employeeName: employee.employee_name,
           employeeRole: employee.employee_role || "Employee",
+          email: email.trim().toLowerCase(),
           isAdmin: employee.employee_role === "Admin",
         });
         navigate("/dashboard", { replace: true });
       } else {
-        // Offline mode: allow login without Supabase
+        localStorage.removeItem("employee_session");
+        localStorage.setItem("offline_user_email", email.trim().toLowerCase());
         localStorage.setItem("auth_token", "offline-" + Date.now());
         navigate("/dashboard", { replace: true });
       }

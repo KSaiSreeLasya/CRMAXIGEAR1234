@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { getEmployeeSession } from "@/lib/auth";
+import { getCurrentUser, getEmployeeSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /** Matches DB check constraint + MODULES_SQL_SETUP.sql */
@@ -85,6 +85,16 @@ function daysInMonth(year: number, month: number) {
 
 function dateISO(year: number, month: number, day: number) {
   return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function todayISO() {
+  const today = new Date();
+  return dateISO(today.getFullYear(), today.getMonth() + 1, today.getDate());
+}
+
+function calculateNetSalary(grossSalary: number | null, paidDays: number, year: number, month: number) {
+  if (grossSalary === null) return null;
+  return Number(((grossSalary * paidDays) / daysInMonth(year, month)).toFixed(2));
 }
 
 function matchesEmployee(record: AttendanceEntry, emp: Employee) {
@@ -179,12 +189,13 @@ export default function Attendance() {
   const [payrollMap, setPayrollMap] = useState<Record<string, PayrollRow>>({});
 
   const [employeeId, setEmployeeId] = useState("");
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendanceDate, setAttendanceDate] = useState(todayISO());
   const [attendanceTime, setAttendanceTime] = useState(new Date().toTimeString().slice(0, 5));
   const [status, setStatus] = useState<AttendanceStatus>("Present");
   const [remark, setRemark] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSalaryAdmin, setIsSalaryAdmin] = useState(false);
 
   const now = new Date();
   const [viewYearMonth, setViewYearMonth] = useState(
@@ -283,6 +294,11 @@ export default function Attendance() {
   };
 
   const loadPayrollForMonth = useCallback(async () => {
+    if (!isSalaryAdmin) {
+      setPayrollMap({});
+      return;
+    }
+
     const monthStart = `${viewYearMonth}-01`;
     if (supabase) {
       try {
@@ -322,7 +338,7 @@ export default function Attendance() {
     } catch {
       setPayrollMap({});
     }
-  }, [viewYearMonth]);
+  }, [isSalaryAdmin, viewYearMonth]);
 
   const persistPayrollLocal = (map: Record<string, PayrollRow>) => {
     setPayrollMap(map);
@@ -366,6 +382,8 @@ export default function Attendance() {
     monthRecords: AttendanceEntry[],
     payrollYm: string,
   ) => {
+    if (!isSalaryAdmin) return;
+
     const { year: pmYear, month: pmMonth } = parseYearMonth(payrollYm);
     const empRows = monthRecords.filter((r) => matchesEmployee(r, emp));
     const computed = computeSummary(empRows, pmYear, pmMonth);
@@ -382,10 +400,11 @@ export default function Attendance() {
         map = {};
       }
       const prevRow = map[emp.id];
+      const grossSalary = prevRow?.grossSalary ?? null;
       const merged: PayrollRow = {
         ...computed,
-        grossSalary: prevRow?.grossSalary ?? null,
-        netSalary: prevRow?.netSalary ?? null,
+        grossSalary,
+        netSalary: calculateNetSalary(grossSalary, computed.paidDays, pmYear, pmMonth),
       };
       map[emp.id] = merged;
       localStorage.setItem(payrollStorageKey(payrollYm), JSON.stringify(map));
@@ -406,7 +425,7 @@ export default function Attendance() {
       .maybeSingle();
 
     gross = existing?.gross_salary != null ? Number(existing.gross_salary) : null;
-    net = existing?.net_salary != null ? Number(existing.net_salary) : null;
+    net = calculateNetSalary(gross, computed.paidDays, pmYear, pmMonth);
 
     const merged: PayrollRow = { ...computed, grossSalary: gross, netSalary: net };
 
@@ -462,12 +481,37 @@ export default function Attendance() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      const employeeSession = getEmployeeSession();
+      if (employeeSession?.email) {
+        if (active) setIsSalaryAdmin(employeeSession.email.toLowerCase() === "admin@axigear.in");
+        return;
+      }
+
+      const offlineEmail = localStorage.getItem("offline_user_email");
+      if (offlineEmail) {
+        if (active) setIsSalaryAdmin(offlineEmail === "admin@axigear.in");
+        return;
+      }
+
+      const currentUser = await getCurrentUser();
+      if (active) setIsSalaryAdmin(currentUser?.email?.toLowerCase() === "admin@axigear.in");
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     void loadAttendance();
   }, [viewYearMonth]);
 
   useEffect(() => {
     void loadPayrollForMonth();
-  }, [loadPayrollForMonth, viewYearMonth]);
+  }, [loadPayrollForMonth]);
 
   const persistLocalAttendance = (rows: AttendanceEntry[]) => {
     const raw = localStorage.getItem("crm_attendance");
@@ -657,18 +701,19 @@ export default function Attendance() {
     }
   };
 
-  const handleSalaryBlur = async (emp: Employee, field: "gross" | "net", raw: string) => {
-    const num = raw === "" ? null : Number(raw);
-    if (raw !== "" && Number.isNaN(num)) return;
+  const handleSalaryBlur = async (emp: Employee, raw: string) => {
+    if (!isSalaryAdmin) return;
+
+    const grossSalary = raw === "" ? null : Number(raw);
+    if (raw !== "" && (!Number.isFinite(grossSalary) || grossSalary < 0)) return;
 
     const empRows = records.filter((r) => matchesEmployee(r, emp));
     const computed = computeSummary(empRows, viewYear, viewMonth);
-    const prev = payrollMap[emp.id];
 
     const merged: PayrollRow = {
       ...computed,
-      grossSalary: field === "gross" ? num : prev?.grossSalary ?? null,
-      netSalary: field === "net" ? num : prev?.netSalary ?? null,
+      grossSalary,
+      netSalary: calculateNetSalary(grossSalary, computed.paidDays, viewYear, viewMonth),
     };
 
     if (supabase) {
@@ -783,6 +828,8 @@ export default function Attendance() {
   const cellEditStatus = cellEdit ? statusForCell(cellEdit.employee, cellEdit.day) : null;
 
   const migrateAllPayrollRecords = async () => {
+    if (!isSalaryAdmin) return;
+
     if (!supabase) {
       alert("Payroll migration only works with Supabase. Local storage will auto-update on view.");
       return;
@@ -862,12 +909,11 @@ export default function Attendance() {
             .maybeSingle();
 
           const gross = existing?.gross_salary != null ? Number(existing.gross_salary) : null;
-          const net = existing?.net_salary != null ? Number(existing.net_salary) : null;
 
           const merged: PayrollRow = {
             ...computed,
             grossSalary: gross,
-            netSalary: net,
+            netSalary: calculateNetSalary(gross, computed.paidDays, pmYear, pmMonth),
           };
 
           await supabase.from("employee_monthly_payroll").upsert(
@@ -915,16 +961,17 @@ export default function Attendance() {
                   <ArrowLeft className="h-4 w-4" />
                   Back to Dashboard
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => migrateAllPayrollRecords()}
-                  className="gap-2 border-amber-500/30 bg-amber-500/5 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
-                >
-                  <span className="text-lg">⚡</span>
-                  Fix all months
-                </Button>
+                {isSalaryAdmin && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => migrateAllPayrollRecords()}
+                    className="gap-2 border-amber-500/30 bg-amber-500/5 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+                  >
+                    Fix all months
+                  </Button>
+                )}
               </div>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-3">
@@ -1125,8 +1172,12 @@ export default function Attendance() {
                           <th className={summaryHeaderClass}>No.of Absents</th>
                           <th className={summaryHeaderClass}>No.of leaves</th>
                           <th className={summaryHeaderClass}>Paid days</th>
-                          <th className={summaryHeaderClass}>Gross Salary</th>
-                          <th className={summaryHeaderClass}>Net Salary</th>
+                          {isSalaryAdmin && (
+                            <>
+                              <th className={summaryHeaderClass}>Gross Salary</th>
+                              <th className={summaryHeaderClass}>Net Salary</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -1186,26 +1237,25 @@ export default function Attendance() {
                               <td className={summaryCellClass}>{s.numAbsents}</td>
                               <td className={summaryCellClass}>{s.numLeaves}</td>
                               <td className={summaryCellClass}>{s.paidDays}</td>
-                              <td className={cn(summaryCellClass, "p-1")}>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  className="h-8 border-amber-200/80 bg-background/90 text-center text-xs font-medium dark:border-amber-900/50"
-                                  defaultValue={s.grossSalary ?? ""}
-                                  key={`g-${emp.id}-${viewYearMonth}-${s.grossSalary ?? ""}`}
-                                  onBlur={(e) => void handleSalaryBlur(emp, "gross", e.target.value)}
-                                />
-                              </td>
-                              <td className={cn(summaryCellClass, "p-1")}>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  className="h-8 border-amber-200/80 bg-background/90 text-center text-xs font-medium dark:border-amber-900/50"
-                                  defaultValue={s.netSalary ?? ""}
-                                  key={`n-${emp.id}-${viewYearMonth}-${s.netSalary ?? ""}`}
-                                  onBlur={(e) => void handleSalaryBlur(emp, "net", e.target.value)}
-                                />
-                              </td>
+                              {isSalaryAdmin && (
+                                <>
+                                  <td className={cn(summaryCellClass, "p-1")}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="h-8 border-amber-200/80 bg-background/90 text-center text-xs font-medium dark:border-amber-900/50"
+                                      defaultValue={s.grossSalary ?? ""}
+                                      key={`g-${emp.id}-${viewYearMonth}-${s.grossSalary ?? ""}`}
+                                      onBlur={(e) => void handleSalaryBlur(emp, e.target.value)}
+                                      aria-label={`Gross salary for ${emp.fullName}`}
+                                    />
+                                  </td>
+                                  <td className={summaryCellClass}>
+                                    {s.netSalary === null ? "—" : s.netSalary.toFixed(2)}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })}
