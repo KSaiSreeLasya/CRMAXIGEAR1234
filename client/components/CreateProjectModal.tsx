@@ -195,7 +195,7 @@ export default function CreateProjectModal({
         const { data, error } = await supabase
           .from("inventory_items")
           .select("chassis_no")
-          .ilike("model_no", `%${modelInput}%`);
+          .ilike("vehicle_model", `%${modelInput}%`);
         if (error) throw error;
         const uniqueChassis = new Set<string>();
         data?.forEach((row: any) => {
@@ -212,7 +212,7 @@ export default function CreateProjectModal({
         const uniqueChassis = new Set<string>();
         list.forEach((row: any) => {
           if (
-            (row.modelNo || "").toLowerCase().includes(modelInput.toLowerCase()) &&
+            (row.vehicleModel || "").toLowerCase().includes(modelInput.toLowerCase()) &&
             row.chassisNo
           ) {
             // Split comma-separated chassis numbers into individual items
@@ -224,7 +224,7 @@ export default function CreateProjectModal({
       }
 
       if (chassisNumbers.length === 0) {
-        setModelLookupMessage("No chassis numbers found for this model in inventory.");
+        setModelLookupMessage("No chassis numbers found for this vehicle model in inventory.");
         setAvailableChassisNumbers([]);
         setShowChassisDropdown(false);
         return;
@@ -232,9 +232,9 @@ export default function CreateProjectModal({
 
       setAvailableChassisNumbers(chassisNumbers);
       setShowChassisDropdown(true);
-      setModelLookupMessage(`Found ${chassisNumbers.length} chassis number(s) for this model. Please select one.`);
+      setModelLookupMessage(`Found ${chassisNumbers.length} chassis number(s) for this vehicle model. Please select one.`);
     } catch (error) {
-      console.error("Error fetching model details from inventory:", error);
+      console.error("Error fetching vehicle model details from inventory:", error);
       setModelLookupMessage("Failed to fetch chassis numbers.");
       setAvailableChassisNumbers([]);
       setShowChassisDropdown(false);

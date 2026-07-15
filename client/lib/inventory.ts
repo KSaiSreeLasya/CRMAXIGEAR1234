@@ -7,7 +7,7 @@ interface InventoryItem {
   closing_stock: number;
   chassis_no: string;
   previous_chassis_no: string;
-  model_no: string;
+  vehicle_model: string;
 }
 
 export async function deductInventoryForSale(
@@ -24,7 +24,7 @@ export async function deductInventoryForSale(
 
       const items = JSON.parse(raw);
       const itemIndex = items.findIndex((item: any) =>
-        (item.modelNo || "").toLowerCase().includes(modelNo.toLowerCase())
+        (item.vehicleModel || "").toLowerCase().includes(modelNo.toLowerCase())
       );
 
       if (itemIndex === -1) return;
@@ -56,16 +56,16 @@ export async function deductInventoryForSale(
       return;
     }
 
-    // Fetch inventory item by model_no
+    // Fetch inventory item by vehicle_model
     const { data: inventoryData, error: fetchError } = await supabase
       .from("inventory_items")
-      .select("id, vehicle_count, sales_count, closing_stock, chassis_no, previous_chassis_no, model_no")
-      .ilike("model_no", `%${modelNo}%`)
+      .select("id, vehicle_count, sales_count, closing_stock, chassis_no, previous_chassis_no, vehicle_model")
+      .ilike("vehicle_model", `%${modelNo}%`)
       .single();
 
     if (fetchError || !inventoryData) {
       console.warn(
-        "Could not find inventory item for model:",
+        "Could not find inventory item for vehicle model:",
         modelNo,
         fetchError?.message
       );
@@ -121,7 +121,7 @@ export async function restoreInventoryForDeletedSale(
 
       const items = JSON.parse(raw);
       const itemIndex = items.findIndex((item: any) =>
-        (item.modelNo || "").toLowerCase().includes(modelNo.toLowerCase())
+        (item.vehicleModel || "").toLowerCase().includes(modelNo.toLowerCase())
       );
 
       if (itemIndex === -1) return;
@@ -157,8 +157,8 @@ export async function restoreInventoryForDeletedSale(
 
     const { data: inventoryData, error: fetchError } = await supabase
       .from("inventory_items")
-      .select("id, vehicle_count, sales_count, closing_stock, chassis_no, previous_chassis_no, model_no")
-      .ilike("model_no", `%${modelNo}%`)
+      .select("id, vehicle_count, sales_count, closing_stock, chassis_no, previous_chassis_no, vehicle_model")
+      .ilike("vehicle_model", `%${modelNo}%`)
       .single();
 
     if (fetchError || !inventoryData) {
