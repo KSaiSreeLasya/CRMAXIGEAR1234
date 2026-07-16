@@ -44,6 +44,7 @@ export default function CreateProjectModal({
   const [modelLookupMessage, setModelLookupMessage] = useState("");
   const [availableChassisNumbers, setAvailableChassisNumbers] = useState<string[]>([]);
   const [showChassisDropdown, setShowChassisDropdown] = useState(false);
+  const [selectedChassisNumbers, setSelectedChassisNumbers] = useState<string[]>([]);
   const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([]);
   const [showSplitPaymentDetails, setShowSplitPaymentDetails] = useState(false);
 
@@ -53,6 +54,7 @@ export default function CreateProjectModal({
       setModelLookupMessage("");
       setAvailableChassisNumbers([]);
       setShowChassisDropdown(false);
+      setSelectedChassisNumbers([]);
       void updateInvoiceNumber(formData.saleType);
     }
   }, [isOpen]);
@@ -136,7 +138,7 @@ export default function CreateProjectModal({
       location: formData.location,
       productDescription: formData.productDescription,
       hsnNo: formData.hsnNo,
-      chassisNo: formData.chassisNo,
+      chassisNo: selectedChassisNumbers.join(", "),
       motorNo: formData.motorNo,
       batteryNo: formData.batteryNo,
       batteryWarranty: formData.batteryWarranty,
@@ -176,6 +178,7 @@ export default function CreateProjectModal({
       saleType: "regular",
       invoiceNo: "",
     });
+    setSelectedChassisNumbers([]);
     setSplitPayments([]);
     setShowSplitPaymentDetails(false);
   };
@@ -244,11 +247,13 @@ export default function CreateProjectModal({
   };
 
   const handleChassisSelect = (chassisNo: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      chassisNo,
-    }));
-    setShowChassisDropdown(false);
+    if (!selectedChassisNumbers.includes(chassisNo)) {
+      setSelectedChassisNumbers([...selectedChassisNumbers, chassisNo]);
+    }
+  };
+
+  const handleRemoveChassis = (chassisNo: string) => {
+    setSelectedChassisNumbers(selectedChassisNumbers.filter(c => c !== chassisNo));
   };
 
   if (!isOpen) return null;
@@ -443,23 +448,32 @@ export default function CreateProjectModal({
               )}
             </div>
 
-            {/* Chassis No - Read Only (Auto-populated from Vehicle Model selection) */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                Chassis No. <span className="text-xs text-muted-foreground">(auto-populated)</span>
-              </label>
-              <input
-                type="text"
-                name="chassisNo"
-                value={formData.chassisNo}
-                readOnly
-                placeholder="Select a vehicle model above to populate"
-                className="w-full px-4 py-2 border rounded-lg bg-muted text-muted-foreground cursor-not-allowed focus:outline-none border-border"
-              />
-              {errors.chassisNo && (
-                <p className="text-sm text-destructive mt-1">{errors.chassisNo}</p>
-              )}
-            </div>
+            {/* Selected Chassis Numbers */}
+            {selectedChassisNumbers.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Selected Chassis Nos. ({selectedChassisNumbers.length})
+                </label>
+                <div className="space-y-2 border border-border rounded-lg p-3 bg-muted/50">
+                  {selectedChassisNumbers.map((chassis) => (
+                    <div
+                      key={chassis}
+                      className="flex items-center justify-between bg-background border border-border rounded-lg p-3"
+                    >
+                      <span className="text-sm font-medium">{chassis}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveChassis(chassis)}
+                        className="text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
+                        title="Remove this chassis"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Motor No */}
             <div>

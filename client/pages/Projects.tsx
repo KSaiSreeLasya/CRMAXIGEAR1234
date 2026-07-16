@@ -464,6 +464,7 @@ export default function Projects() {
             invoice_date: newProject.invoiceDate || null,
             delivery_date: newProject.deliveryDate || null,
             amount: newProject.amount,
+            miscellaneous_price: 0,
             mode_of_payment: newProject.modeOfPayment,
             lead_source: newProject.leadSource || null,
             gst_no: newProject.gstNo || null,
@@ -475,19 +476,47 @@ export default function Projects() {
           let insertResult = await supabase
             .from('projects')
             .insert([projectInsert])
-            .select('*');
+            .select();
 
           if (insertResult.error?.message?.includes("'sale_type'")) {
             const { sale_type: _saleType, ...legacyProjectInsert } = projectInsert;
             insertResult = await supabase
               .from('projects')
               .insert([legacyProjectInsert])
-              .select('*');
+              .select();
+          }
+
+          if (insertResult.error?.message?.includes("ON CONFLICT")) {
+            console.warn('ON CONFLICT error detected - retrying without select clause...');
+            const retryResult = await supabase
+              .from('projects')
+              .insert([projectInsert]);
+
+            if (!retryResult.error) {
+              // Fetch the created record
+              const fetchResult = await supabase
+                .from('projects')
+                .select()
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+              if (fetchResult.data && fetchResult.data.length > 0) {
+                insertResult = { data: fetchResult.data, error: null };
+              }
+            } else {
+              insertResult = retryResult as any;
+            }
           }
 
           const { data, error } = insertResult;
           if (error) {
             console.error('Supabase insert error:', error);
+            console.error('Error details:', {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint,
+            });
             throw error;
           }
 
@@ -738,20 +767,47 @@ export default function Projects() {
         battery_warranty: item.batteryWarranty || null,
         battery_capacity: item.batteryCapacity || null,
         vehicle_warranty: item.vehicleWarranty || null,
-        invoice_date: item.invoiceDate,
+        invoice_date: item.invoiceDate || null,
+        delivery_date: item.deliveryDate || null,
         amount: Number(item.amount || 0),
+        miscellaneous_price: 0,
         mode_of_payment: item.modeOfPayment || "Cash",
         lead_source: item.leadSource || null,
+        gst_no: item.gstNo || null,
+        sale_type: item.saleType || "regular",
         invoice_no: item.invoiceNo || null,
+        show_split_payment_details: item.showSplitPaymentDetails ?? false,
       }));
 
       if (supabase) {
         try {
-          const { data, error } = await supabase
+          let insertResult = await supabase
             .from("projects")
             .insert(projectsToInsert)
             .select();
 
+          if (insertResult.error?.message?.includes("ON CONFLICT")) {
+            console.warn('ON CONFLICT error during import - retrying without select clause...');
+            const retryResult = await supabase
+              .from("projects")
+              .insert(projectsToInsert);
+
+            if (!retryResult.error) {
+              const fetchResult = await supabase
+                .from("projects")
+                .select()
+                .order('created_at', { ascending: false })
+                .limit(projectsToInsert.length);
+
+              if (fetchResult.data && fetchResult.data.length > 0) {
+                insertResult = { data: fetchResult.data, error: null };
+              }
+            } else {
+              insertResult = retryResult as any;
+            }
+          }
+
+          const { data, error } = insertResult;
           if (error) throw error;
 
           data?.forEach((row: any) => {
