@@ -99,21 +99,12 @@ export default function Inventory() {
   const [availableModels, setAvailableModels] = useState<BrandModel[]>([]);
 
   const employeeSession = getEmployeeSession();
-  const [canManageCosts, setCanManageCosts] = useState(false);
+  const [canManageCosts, setCanManageCosts] = useState(true);
 
   useEffect(() => {
     void loadInventory();
     void loadSpares();
     void loadBrands();
-    void (async () => {
-      const employeeEmail = employeeSession?.email ?? localStorage.getItem("offline_user_email");
-      if (employeeEmail?.toLowerCase() === "admin@axigear.in") {
-        setCanManageCosts(true);
-        return;
-      }
-      const user = await getCurrentUser();
-      setCanManageCosts(user?.email?.toLowerCase() === "admin@axigear.in");
-    })();
   }, []);
 
   const persistLocal = (rows: InventoryItem[]) => {
@@ -291,9 +282,6 @@ export default function Inventory() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      if (!canManageCosts) {
-        throw new Error("Only admin@axigear.in can add or edit inventory cost prices.");
-      }
       const vehicleCount = Number(form.vehicleCount || 0);
       const batteryCount = Number(form.batteryCount || 0);
       const salesCount = Number(form.salesCount || 0);
@@ -774,9 +762,6 @@ export default function Inventory() {
 
   const handleImportInventory = async (importedItems: Record<string, any>[]) => {
     try {
-      if (!canManageCosts) {
-        throw new Error("Only admin@axigear.in can import inventory cost prices.");
-      }
       let userId: string | undefined;
 
       if (employeeSession) {
@@ -971,7 +956,7 @@ export default function Inventory() {
               <h2 className="text-xl font-semibold mb-4">
                 {editingId ? "Edit Inventory Row" : "Add Inventory Row"}
               </h2>
-              {canManageCosts ? <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="Sl.No" value={form.slNo} onChange={(e) => setForm((prev) => ({ ...prev, slNo: e.target.value }))} required />
                 <input className="px-4 py-2 border border-border rounded-lg bg-background" placeholder="Model No" value={form.modelNo} onChange={(e) => setForm((prev) => ({ ...prev, modelNo: e.target.value }))} />
                 <select className="px-4 py-2 border border-border rounded-lg bg-background" value={form.brand} onChange={(e) => handleBrandChange(e.target.value)} required>
@@ -1059,7 +1044,7 @@ export default function Inventory() {
                     Cancel
                   </button>
                 )}
-              </form> : <p className="text-sm text-muted-foreground">Only admin@axigear.in can add or edit inventory, including lot and transportation prices.</p>}
+              </form>
             </div>
 
             <div className="bg-card rounded-lg border border-border p-6">
