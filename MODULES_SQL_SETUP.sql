@@ -181,20 +181,20 @@ create policy "attendance_delete_own" on public.attendance
 for delete using (auth.uid() = user_id);
 
 drop policy if exists "inventory_select_own" on public.inventory_items;
-create policy "inventory_select_own" on public.inventory_items
-for select using (auth.uid() = user_id);
+create policy "inventory_select_all_employees" on public.inventory_items
+for select using (auth.role() = 'authenticated');
 
 drop policy if exists "inventory_insert_own" on public.inventory_items;
-create policy "inventory_insert_own" on public.inventory_items
-for insert with check (auth.uid() = user_id);
+create policy "inventory_insert_all_employees" on public.inventory_items
+for insert with check (auth.role() = 'authenticated');
 
 drop policy if exists "inventory_update_own" on public.inventory_items;
-create policy "inventory_update_own" on public.inventory_items
-for update using (auth.uid() = user_id);
+create policy "inventory_update_all_employees" on public.inventory_items
+for update using (auth.role() = 'authenticated');
 
 drop policy if exists "inventory_delete_own" on public.inventory_items;
-create policy "inventory_delete_own" on public.inventory_items
-for delete using (auth.uid() = user_id);
+create policy "inventory_delete_all_employees" on public.inventory_items
+for delete using (auth.role() = 'authenticated');
 
 -- ---------------------------------------------------------------------------
 -- Attendance enhancements: Weekly Off, optional employee link, monthly payroll
