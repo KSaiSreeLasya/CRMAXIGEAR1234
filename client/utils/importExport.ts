@@ -20,6 +20,8 @@ export const COLUMN_MAPPINGS: Record<string, Record<string, string[]>> = {
   },
   projects: {
     modelNo: ["model_no", "model no", "modelno", "model"],
+    brand: ["brand"],
+    vehicleModel: ["vehicle_model", "vehicle model", "vehiclemodel"],
     customerName: ["customer_name", "customer name", "customername"],
     contactNo: ["contact_no", "contact no", "contactno", "phone"],
     location: ["location", "address"],

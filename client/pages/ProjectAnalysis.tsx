@@ -11,6 +11,8 @@ interface ProjectSale {
   id: string;
   customerName: string;
   modelNo: string;
+  brand: string;
+  vehicleModel: string;
   amount: number;
   invoiceDate: string;
 }
@@ -91,7 +93,7 @@ export default function ProjectAnalysis() {
       try {
         if (supabase) {
           const [projectsResult, inventoryResult] = await Promise.all([
-            supabase.from("projects").select("id, customer_name, model_no, amount, invoice_date").order("created_at", { ascending: false }),
+            supabase.from("projects").select("id, customer_name, model_no, brand, vehicle_model, amount, invoice_date").order("created_at", { ascending: false }),
             supabase.from("inventory_items").select("model_no, vehicle_model, lot_price, transportation_price, brand, chassis_colors"),
           ]);
 
@@ -103,6 +105,8 @@ export default function ProjectAnalysis() {
               id: project.id,
               customerName: project.customer_name ?? "-",
               modelNo: project.model_no ?? "",
+              brand: project.brand ?? "",
+              vehicleModel: project.vehicle_model ?? "",
               amount: Number(project.amount ?? 0),
               invoiceDate: project.invoice_date ?? "",
             })),
@@ -126,6 +130,8 @@ export default function ProjectAnalysis() {
             id: project.id,
             customerName: project.customerName ?? "-",
             modelNo: project.modelNo ?? "",
+            brand: project.brand ?? "",
+            vehicleModel: project.vehicleModel ?? "",
             amount: Number(project.amount ?? 0),
             invoiceDate: project.invoiceDate ?? "",
           })),
@@ -167,7 +173,14 @@ export default function ProjectAnalysis() {
           (item) => normalize(item.modelNo) === model || normalize(item.vehicleModel) === model,
         );
         const costPrice = inventory?.costPrice ?? 0;
-        return { ...sale, costPrice, profit: sale.amount - costPrice, hasCost: Boolean(inventory), brand: inventory?.brand ?? "Unknown" };
+        return {
+          ...sale,
+          costPrice,
+          profit: sale.amount - costPrice,
+          hasCost: Boolean(inventory),
+          brand: sale.brand || inventory?.brand || "Unknown",
+          vehicleModel: sale.vehicleModel || inventory?.vehicleModel || sale.modelNo,
+        };
       }),
     [inventoryCosts, sales],
   );
@@ -256,7 +269,7 @@ export default function ProjectAnalysis() {
 
       brandMap.set(brand, {
         brand,
-        modelCount: new Set(rows.filter((r) => r.brand === brand).map((r) => r.modelNo)).size,
+        modelCount: new Set(rows.filter((r) => r.brand === brand).map((r) => r.vehicleModel || r.modelNo)).size,
         colorCount: Math.max(existing.colorCount, colorCount),
         totalSales: existing.totalSales + 1,
         totalRevenue: existing.totalRevenue + row.amount,
@@ -289,7 +302,7 @@ export default function ProjectAnalysis() {
           };
 
           existing.brands.add(row.brand || "Unknown");
-          existing.models.add(row.modelNo || "Unknown");
+          existing.models.add(row.vehicleModel || row.modelNo || "Unknown");
           existing.totalSales += 1;
           existing.totalRevenue += row.amount;
 

@@ -425,6 +425,8 @@ export default function Projects() {
       const createdProject: Project = {
         id: `project_${Date.now()}`,
         modelNo: newProject.modelNo || "",
+        brand: newProject.brand || "",
+        vehicleModel: newProject.vehicleModel || "",
         customerName: newProject.customerName,
         contactNo: newProject.contactNo,
         location: newProject.location,
@@ -456,6 +458,8 @@ export default function Projects() {
           const projectInsert = {
             user_id: user.id,
             model_no: newProject.modelNo || null,
+            brand: newProject.brand || null,
+            vehicle_model: newProject.vehicleModel || null,
             customer_name: newProject.customerName,
             contact_no: newProject.contactNo,
             location: newProject.location,
@@ -529,6 +533,8 @@ export default function Projects() {
           const dbProject: Project = {
             id: data[0].id,
             modelNo: data[0].model_no || "",
+            brand: data[0].brand || "",
+            vehicleModel: data[0].vehicle_model || "",
             customerName: data[0].customer_name,
             contactNo: data[0].contact_no,
             location: data[0].location,
@@ -606,6 +612,8 @@ export default function Projects() {
           const projectUpdate = {
             customer_name: updatedData.customerName,
             model_no: updatedData.modelNo || null,
+            brand: updatedData.brand || null,
+            vehicle_model: updatedData.vehicleModel || null,
             contact_no: updatedData.contactNo,
             location: updatedData.location,
             product_description: updatedData.productDescription,
@@ -762,6 +770,8 @@ export default function Projects() {
       const projectsToInsert = importedItems.map((item) => ({
         user_id: userId,
         model_no: item.modelNo || null,
+        brand: item.brand || null,
+        vehicle_model: item.vehicleModel || null,
         customer_name: item.customerName,
         contact_no: item.contactNo,
         location: item.location,
@@ -820,6 +830,8 @@ export default function Projects() {
             newProjects.push({
               id: row.id,
               modelNo: row.model_no || "",
+              brand: row.brand || "",
+              vehicleModel: row.vehicle_model || "",
               customerName: row.customer_name,
               contactNo: row.contact_no,
               location: row.location,
@@ -846,6 +858,8 @@ export default function Projects() {
             const project: Project = {
               id: `project_${Date.now()}_${Math.random()}`,
               modelNo: item.modelNo || "",
+              brand: item.brand || "",
+              vehicleModel: item.vehicleModel || "",
               customerName: item.customerName,
               contactNo: item.contactNo,
               location: item.location,

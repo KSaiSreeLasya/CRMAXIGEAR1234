@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { BarChart3, Briefcase, CalendarCheck2, Boxes, ShieldCheck, Wrench, Users, Receipt, Truck } from "lucide-react";
+import { BarChart3, Briefcase, CalendarCheck2, Boxes, ShieldCheck, Wrench, Users, Receipt, Truck, Bell, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -11,13 +11,51 @@ interface UpcomingDelivery {
   deliverables: string;
 }
 
+interface LatestInvoiceNotification {
+  projectId: string;
+  invoiceNo: string;
+  customerName: string;
+  contactNo: string;
+  updatedAt: string;
+}
+
 export default function Dashboard() {
   const [upcomingDeliveries, setUpcomingDeliveries] = useState<UpcomingDelivery[]>([]);
+  const [latestInvoice, setLatestInvoice] = useState<LatestInvoiceNotification | null>(null);
+  const [dismissedInvoiceAt, setDismissedInvoiceAt] = useState(() => localStorage.getItem("crm_dashboard_dismissed_invoice") ?? "");
+  const [dismissedDeliverySignature, setDismissedDeliverySignature] = useState(() => localStorage.getItem("crm_dashboard_dismissed_delivery") ?? "");
   const [isLoadingDeliveries, setIsLoadingDeliveries] = useState(true);
 
   useEffect(() => {
     fetchUpcomingDeliveries();
+    loadLatestInvoiceNotification();
+    window.addEventListener("storage", loadLatestInvoiceNotification);
+    return () => window.removeEventListener("storage", loadLatestInvoiceNotification);
   }, []);
+
+  const loadLatestInvoiceNotification = () => {
+    try {
+      const saved = localStorage.getItem("crm_latest_invoice_notification");
+      setLatestInvoice(saved ? JSON.parse(saved) as LatestInvoiceNotification : null);
+    } catch {
+      setLatestInvoice(null);
+    }
+  };
+
+  const deliverySignature = upcomingDeliveries.map((delivery) => delivery.id).join(",");
+  const hasLatestInvoiceNotification = Boolean(latestInvoice && latestInvoice.updatedAt !== dismissedInvoiceAt);
+  const hasDeliveryNotification = !isLoadingDeliveries && upcomingDeliveries.length > 0 && deliverySignature !== dismissedDeliverySignature;
+
+  const dismissInvoiceNotification = () => {
+    if (!latestInvoice) return;
+    localStorage.setItem("crm_dashboard_dismissed_invoice", latestInvoice.updatedAt);
+    setDismissedInvoiceAt(latestInvoice.updatedAt);
+  };
+
+  const dismissDeliveryNotification = () => {
+    localStorage.setItem("crm_dashboard_dismissed_delivery", deliverySignature);
+    setDismissedDeliverySignature(deliverySignature);
+  };
 
   const fetchUpcomingDeliveries = async () => {
     setIsLoadingDeliveries(true);
@@ -60,15 +98,57 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {!isLoadingDeliveries && upcomingDeliveries.length > 0 && (
+          {hasLatestInvoiceNotification && latestInvoice && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Bell className="h-6 w-6 text-green-700 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-semibold text-green-900">Latest invoice update</h3>
+                    <button
+                      type="button"
+                      onClick={dismissInvoiceNotification}
+                      aria-label="Close invoice notification"
+                      className="rounded p-1 text-green-700 hover:bg-green-100"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-green-800 mt-1">
+                    Invoice <strong>{latestInvoice.invoiceNo}</strong> for <strong>{latestInvoice.customerName}</strong> is ready to send.
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">Customer contact: {latestInvoice.contactNo || "Not provided"}</p>
+                  <Link
+                    to={`/invoice/${latestInvoice.projectId}`}
+                    className="inline-block mt-3 text-sm font-semibold text-green-700 hover:text-green-900 underline"
+                  >
+                    Open invoice and send on WhatsApp →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {hasDeliveryNotification && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-start gap-3 mb-3">
                 <Truck className="h-6 w-6 text-orange-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold text-orange-900">Upcoming Deliveries (Next 7 Days)</h3>
-                  <p className="text-sm text-orange-800 mt-1">
-                    You have <strong>{upcomingDeliveries.length}</strong> delivery(ies) scheduled in the next 7 days.
+                <div className="flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-semibold text-orange-900">Delivery module updated</h3>
+                    <button
+                      type="button"
+                      onClick={dismissDeliveryNotification}
+                      aria-label="Close delivery notification"
+                      className="rounded p-1 text-orange-700 hover:bg-orange-100"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-orange-800 mt-1 mb-3">
+                    You have <strong>{upcomingDeliveries.length}</strong> delivery(ies) scheduled in the next 7 days. Please visit the Delivery module.
                   </p>
+                  <h4 className="font-semibold text-orange-900">Upcoming Deliveries (Next 7 Days)</h4>
                 </div>
               </div>
               <div className="ml-9 space-y-2 max-h-48 overflow-y-auto">
