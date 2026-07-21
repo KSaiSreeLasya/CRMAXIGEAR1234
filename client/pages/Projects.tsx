@@ -157,6 +157,7 @@ export default function Projects() {
             gstNo: project.gst_no || "",
             saleType: project.sale_type || "regular",
             invoiceNo: project.invoice_no || "",
+            saleCompletedBy: project.sale_completed_by || "",
             createdAt: new Date(project.created_at).toLocaleDateString(),
           })) || [];
 

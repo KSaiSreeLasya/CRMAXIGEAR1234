@@ -196,6 +196,35 @@ drop policy if exists "inventory_delete_own" on public.inventory_items;
 create policy "inventory_delete_all_employees" on public.inventory_items
 for delete using (auth.role() = 'authenticated');
 
+do $$
+begin
+  if to_regclass('public.brands') is not null then
+    alter table public.brands enable row level security;
+    execute 'drop policy if exists "brands_select_admin_or_owner" on public.brands';
+    execute $policy$
+      create policy "brands_select_admin_or_owner" on public.brands
+      for select to authenticated
+      using (
+        auth.uid() = user_id
+        or lower(coalesce(auth.jwt() ->> 'email', '')) = 'admin@axigear.in'
+      )
+    $policy$;
+  end if;
+
+  if to_regclass('public.brand_models') is not null then
+    alter table public.brand_models enable row level security;
+    execute 'drop policy if exists "brand_models_select_admin_or_owner" on public.brand_models';
+    execute $policy$
+      create policy "brand_models_select_admin_or_owner" on public.brand_models
+      for select to authenticated
+      using (
+        auth.uid() = user_id
+        or lower(coalesce(auth.jwt() ->> 'email', '')) = 'admin@axigear.in'
+      )
+    $policy$;
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- Attendance enhancements: Weekly Off, optional employee link, monthly payroll
 -- ---------------------------------------------------------------------------
