@@ -86,36 +86,36 @@ export default function EditProjectModal({
         gstNo: project.gstNo || "",
         saleType: project.saleType || "regular",
         invoiceNo: project.invoiceNo || "",
-        saleCompletedByOther: "",
+        saleCompletedByOther: project.saleCompletedBy || "",
       });
       setShowSplitPaymentDetails(project.showSplitPaymentDetails ?? false);
 
-      // Parse existing saleCompletedBy data
-      const saleCompletedBy = project.saleCompletedBy || "";
-      const parts = saleCompletedBy.split(", ");
-      const selected: string[] = [];
-      let otherText = "";
-
-      parts.forEach((part) => {
-        const trimmed = part.trim();
-        if (trimmed) {
-          // Check if this is an employee name
-          if (employees.some((emp) => emp.fullName === trimmed)) {
-            selected.push(trimmed);
-          } else {
-            otherText = trimmed;
-          }
-        }
-      });
-
-      setSelectedEmployees(selected);
-      setFormData((prev) => ({ ...prev, saleCompletedByOther: otherText }));
+      setSelectedEmployees([]);
 
       // Load fresh split payments from database
       loadSplitPayments();
       loadEmployees();
     }
   }, [project, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !project) return;
+
+    const employeeNames = new Set(employees.map((employee) => employee.fullName));
+    const selected: string[] = [];
+    const other: string[] = [];
+
+    (project.saleCompletedBy || "").split(",").map((value) => value.trim()).filter(Boolean).forEach((value) => {
+      if (employeeNames.has(value)) {
+        selected.push(value);
+      } else {
+        other.push(value);
+      }
+    });
+
+    setSelectedEmployees(selected);
+    setFormData((prev) => ({ ...prev, saleCompletedByOther: other.join(", ") }));
+  }, [employees, isOpen, project]);
 
   const loadSplitPayments = async () => {
     if (!project) return;
@@ -238,6 +238,9 @@ export default function EditProjectModal({
       gstNo: formData.gstNo,
       saleType: formData.saleType as "regular" | "b2b",
       invoiceNo: formData.invoiceNo,
+      saleCompletedBy: [...selectedEmployees, formData.saleCompletedByOther.trim()]
+        .filter(Boolean)
+        .join(", "),
       splitPayments: splitPayments,
       showSplitPaymentDetails,
     });
@@ -734,6 +737,36 @@ export default function EditProjectModal({
                 className="w-full px-4 py-2 border border-border rounded-lg bg-background transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-muted-foreground mt-1">Update invoice number if needed</p>
+            </div>
+
+            {/* Sale Completed By */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">Sale completed by</label>
+              <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+                {employees.length > 0 ? employees.map((employee) => (
+                  <label key={employee.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selectedEmployees.includes(employee.fullName)}
+                      onChange={(event) => setSelectedEmployees((current) => event.target.checked
+                        ? [...current, employee.fullName]
+                        : current.filter((name) => name !== employee.fullName))}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <span>{employee.fullName}{!employee.isActive ? " (Inactive)" : ""}</span>
+                  </label>
+                )) : (
+                  <p className="text-sm text-muted-foreground">No employees available.</p>
+                )}
+                <input
+                  type="text"
+                  name="saleCompletedByOther"
+                  value={formData.saleCompletedByOther}
+                  onChange={handleChange}
+                  placeholder="Other (enter name or text)"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background"
+                />
+              </div>
             </div>
 
             {/* Split Payment Section */}
