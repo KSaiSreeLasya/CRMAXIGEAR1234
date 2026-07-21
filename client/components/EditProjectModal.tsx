@@ -128,6 +128,37 @@ export default function EditProjectModal({
     }
   };
 
+  const loadEmployees = async () => {
+    try {
+      let rows: SaleEmployee[] = [];
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("employees")
+          .select("id, full_name, is_active")
+          .order("full_name", { ascending: true });
+        if (error) throw error;
+        rows = (data || []).map((row: any) => ({
+          id: row.id,
+          fullName: row.full_name || "",
+          isActive: row.is_active ?? true,
+        }));
+      } else {
+        const raw = localStorage.getItem("crm_employees");
+        rows = raw
+          ? (JSON.parse(raw) as Array<{ id: string; fullName: string; isActive?: boolean }>).map((row) => ({
+              id: row.id,
+              fullName: row.fullName || "",
+              isActive: row.isActive ?? true,
+            }))
+          : [];
+      }
+      setEmployees(rows.filter((employee) => employee.fullName.trim().toLowerCase() !== "raju k"));
+    } catch (error) {
+      console.error("Failed to load employees:", error);
+      setEmployees([]);
+    }
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
